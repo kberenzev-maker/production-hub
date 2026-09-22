@@ -23,6 +23,7 @@ interface ProductionContextType {
   setCurrentProjectId: (id: string) => void;
   currentProject: Project | null;
   completeProjectSetup: (projectId: string, members: ProjectMember[]) => void;
+  updateProjectMembers: (projectId: string, members: ProjectMember[]) => void;
   currentUser: {
     id?: number;
     name: string;
@@ -192,6 +193,21 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           ...p,
           members,
           isSetupComplete: true,
+          updatedAt: new Date().toISOString()
+        };
+        syncService.sendProjectUpsert(updated);
+        return updated;
+      }
+      return p;
+    }));
+  };
+
+  const updateProjectMembers = (projectId: string, members: ProjectMember[]) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        const updated: Project = {
+          ...p,
+          members,
           updatedAt: new Date().toISOString()
         };
         syncService.sendProjectUpsert(updated);
@@ -1648,6 +1664,7 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setCurrentProjectId,
         currentProject,
         completeProjectSetup,
+        updateProjectMembers,
         currentUser,
         scaffoldProjectTopics,
         botLogs,

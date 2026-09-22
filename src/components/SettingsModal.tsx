@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useProduction } from '../context/ProductionContext';
-import { UserRole } from '../types';
+import { ProjectMember, TeamRole, TEAM_ROLES, WeekDayShort } from '../types';
 import { 
   X, 
   Settings, 
   Sliders, 
-  MessageSquare, 
   Users, 
   Check, 
   Save, 
@@ -14,27 +13,20 @@ import {
   Layers, 
   Flame, 
   ShieldCheck, 
-  User,
   Shield,
   Trash2,
   AlertTriangle,
   RotateCcw,
   Calendar,
   Sparkles,
-  Bot,
-  ExternalLink,
-  FolderKanban,
-  CheckCircle2,
-  RefreshCw,
-  FolderPlus
+  Plus,
+  UserPlus
 } from 'lucide-react';
-import { TeamManagementModal } from './TeamManagementModal';
-import { WeekDayShort } from '../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'norms' | 'project' | 'team' | 'schedule' | 'bot' | 'system';
+  initialTab?: 'norms' | 'schedule' | 'team' | 'system' | 'project' | 'bot';
 }
 
 const ALL_WEEKDAYS: { id: WeekDayShort; label: string; full: string }[] = [
@@ -50,87 +42,139 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
   const { 
     norms, 
     updateNorms, 
-    projectName, 
-    setProjectName, 
-    chatTitle, 
-    setChatTitle, 
-    telegramHandle, 
-    setTelegramHandle,
-    currentRole,
-    chatUsers,
-    updateUserRole,
-    clearAllTasks,
-    resetAllData,
-    weeklySchedule,
-    updateWeeklySchedule,
-    setIsWeeklyPlannerOpen,
-    projects,
+    clearAllTasks, 
+    resetAllData, 
+    weeklySchedule, 
+    updateWeeklySchedule, 
+    setIsWeeklyPlannerOpen, 
+    projects, 
     currentProjectId,
-    setCurrentProjectId,
-    scaffoldProjectTopics
+    updateProjectMembers
   } = useProduction();
 
-  const [activeSubTab, setActiveSubTab] = useState<'norms' | 'project' | 'team' | 'schedule' | 'bot' | 'system'>(initialTab || 'norms');
+  const currentProject = projects.find(p => p.id === currentProjectId) || projects[0] || null;
 
-  React.useEffect(() => {
+  // Normalize initialTab, falling back from legacy 'project' or 'bot' to 'norms'
+  const resolveTab = (tab?: string): 'norms' | 'schedule' | 'team' | 'system' => {
+    if (tab === 'schedule' || tab === 'team' || tab === 'system') return tab;
+    return 'norms';
+  };
+
+  const [activeSubTab, setActiveSubTab] = useState<'norms' | 'schedule' | 'team' | 'system'>(
+    resolveTab(initialTab)
+  );
+
+  useEffect(() => {
     if (initialTab) {
-      setActiveSubTab(initialTab);
+      setActiveSubTab(resolveTab(initialTab));
     }
   }, [initialTab]);
 
-  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
-  const [confirmResetTasks, setConfirmResetTasks] = useState(false);
-  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
-
-  // Form state
+  // Norms Form state
   const [reelsNorm, setReelsNorm] = useState(norms.monthPlanReels);
   const [carouselsNorm, setCarouselsNorm] = useState(norms.monthPlanCarousels);
   const [storiesNorm, setStoriesNorm] = useState(norms.monthPlanStories);
   const [bufferTarget, setBufferTarget] = useState(norms.bufferTarget);
 
-  const [localProjectName, setLocalProjectName] = useState(projectName);
-  const [localChatTitle, setLocalChatTitle] = useState(chatTitle);
-  const [localTgHandle, setLocalTgHandle] = useState(telegramHandle);
+  // Team members local state
+  const [teamMembers, setTeamMembers] = useState<ProjectMember[]>(() => {
+    return currentProject?.members && currentProject.members.length > 0 
+      ? currentProject.members 
+      : [];
+  });
 
-  const currentProject = projects.find(p => p.id === currentProjectId) || projects[0];
-  const [scaffoldChatId, setScaffoldChatId] = useState<string>(
-    currentProject ? String(currentProject.chatId) : '-1002145893201'
-  );
-  const [scaffoldChatTitle, setScaffoldChatTitle] = useState<string>(
-    currentProject ? currentProject.title : projectName
-  );
-  const [isScaffolding, setIsScaffolding] = useState(false);
-  const [scaffoldSuccess, setScaffoldSuccess] = useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (currentProject) {
-      setScaffoldChatId(String(currentProject.chatId));
-      setScaffoldChatTitle(currentProject.title);
+  useEffect(() => {
+    if (currentProject?.members && currentProject.members.length > 0) {
+      setTeamMembers(currentProject.members);
     }
-  }, [currentProjectId, currentProject]);
+  }, [currentProject?.members]);
 
+  // System reset states
+  const [confirmResetTasks, setConfirmResetTasks] = useState(false);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
 
   if (!isOpen) return null;
   if (typeof document === 'undefined') return null;
 
-  const handleSaveNorms = (e: React.FormEvent) => {
+  // Team Management Handlers
+  const handleToggleMemberRole = (memberId: string, role: TeamRole) => {
+    setTeamError(null);
+    setTeamMembers(prev => prev.map(m => {
+      if (m.id !== memberId) return m;
+      const hasRole = m.roles.includes(role);
+      const newRoles = hasRole 
+        ? m.roles.filter(r => r !== role)
+        : [...m.roles, role];
+      return { ...m, roles: newRoles };
+    }));
+  };
+
+  const handleUpdateMemberName = (id: string, name: string) => {
+    setTeamMembers(prev => prev.map(m => m.id === id ? { ...m, name } : m));
+  };
+
+  const handleUpdateMemberUsername = (id: string, username: string) => {
+    const formatted = username.startsWith('@') || !username ? username : `@${username}`;
+    setTeamMembers(prev => prev.map(m => m.id === id ? { ...m, username: formatted } : m));
+  };
+
+  const handleAddMember = () => {
+    setTeamMembers(prev => [
+      ...prev,
+      {
+        id: `member-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: '',
+        username: '',
+        roles: []
+      }
+    ]);
+  };
+
+  const handleRemoveMember = (id: string) => {
+    if (teamMembers.length <= 1) {
+      setTeamError('В проекте должен оставаться хотя бы один участник команды.');
+      return;
+    }
+    setTeamMembers(prev => prev.filter(m => m.id !== id));
+  };
+
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate team if on team tab or saving all
+    for (const m of teamMembers) {
+      if (!m.name.trim()) {
+        setActiveSubTab('team');
+        setTeamError('Укажите имя для каждого участника команды.');
+        return;
+      }
+      if (m.roles.length === 0) {
+        setActiveSubTab('team');
+        setTeamError(`Выберите хотя бы одну роль для ${m.name}.`);
+        return;
+      }
+    }
+
+    // Save Norms
     updateNorms({
       monthPlanReels: Number(reelsNorm),
       monthPlanCarousels: Number(carouselsNorm),
       monthPlanStories: Number(storiesNorm),
       bufferTarget: Number(bufferTarget)
     });
-    setProjectName(localProjectName.trim() || '[project name]');
-    setChatTitle(localChatTitle.trim() || 'chat_supergroup');
-    setTelegramHandle(localTgHandle.trim() || 'kirillber');
+
+    // Save Team
+    if (currentProject) {
+      updateProjectMembers(currentProject.id, teamMembers);
+    }
 
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
       onClose();
-    }, 800);
+    }, 700);
   };
 
   return createPortal(
@@ -152,7 +196,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-base leading-tight">Настройки системы</h3>
-              <p className="text-xs text-slate-500">Нормативы, проект, чат и интеграция</p>
+              <p className="text-xs text-slate-500">
+                {currentProject ? `Проект «${currentProject.title}»` : 'Нормативы, ритм недели и роли'}
+              </p>
             </div>
           </div>
           <button
@@ -163,48 +209,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
           </button>
         </div>
 
-        {/* Sub-tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-50/50 px-4 sm:px-5 pt-2 gap-1 sm:gap-2 text-xs font-semibold shrink-0 overflow-x-auto">
+        {/* Tab Navigation - Sleek, strictly NO scrollbar, only 4 essential tabs */}
+        <div className="flex border-b border-slate-200 bg-slate-50/60 px-3 sm:px-5 pt-2 gap-1 sm:gap-2 text-xs font-semibold shrink-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
             onClick={() => setActiveSubTab('norms')}
-            className={`pb-2 px-2.5 sm:px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`pb-2 px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               activeSubTab === 'norms'
                 ? 'border-indigo-600 text-indigo-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
-            <span>Нормативы и буфер</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('project')}
-            className={`pb-2 px-2.5 sm:px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              activeSubTab === 'project'
-                ? 'border-indigo-600 text-indigo-700 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Проект и Чат</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('bot')}
-            className={`pb-2 px-2.5 sm:px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              activeSubTab === 'bot'
-                ? 'border-indigo-600 text-indigo-700 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Bot className="w-3.5 h-3.5" />
-            <span>Telegram Бот</span>
+            <span>Нормативы</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveSubTab('schedule')}
-            className={`pb-2 px-2.5 sm:px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`pb-2 px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               activeSubTab === 'schedule'
                 ? 'border-indigo-600 text-indigo-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -216,32 +238,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
           <button
             type="button"
             onClick={() => setActiveSubTab('team')}
-            className={`pb-2 px-2.5 sm:px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`pb-2 px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               activeSubTab === 'team'
                 ? 'border-indigo-600 text-indigo-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span>Участники и роли</span>
+            <span>Команда и роли</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveSubTab('system')}
-            className={`pb-2 px-2.5 sm:px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`pb-2 px-3 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
               activeSubTab === 'system'
                 ? 'border-rose-600 text-rose-700 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-            <span>Управление данными и сброс</span>
+            <span>Сброс</span>
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSaveNorms} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 text-xs text-slate-700">
+            
+            {/* TAB 1: НОРМАТИВЫ И БУФЕР */}
             {activeSubTab === 'norms' && (
               <div className="space-y-4">
                 <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 text-amber-900 space-y-1">
@@ -250,7 +274,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
                     Управление производственными нормативами
                   </div>
                   <p className="text-[11px] text-amber-800 leading-relaxed">
-                    Супер-админ может гибко настраивать месячные планы раздельно для Reels, Каруселей и Stories, а также порог буфера безопасности.
+                    Настройте месячные планы раздельно для Reels, Каруселей и Stories, а также целевой буфер безопасности.
                   </p>
                 </div>
 
@@ -364,290 +388,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
               </div>
             )}
 
-            {activeSubTab === 'project' && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Название проекта:
-                  </label>
-                  <input
-                    type="text"
-                    value={localProjectName}
-                    onChange={(e) => setLocalProjectName(e.target.value)}
-                    placeholder="[project name]"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Отображается в статическом блоке под хедером.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Имя супергруппы / чата в Telegram:
-                  </label>
-                  <div className="flex items-center">
-                    <span className="px-2.5 py-2 bg-slate-100 border border-r-0 border-slate-200 rounded-l-lg text-slate-500">
-                      @
-                    </span>
-                    <input
-                      type="text"
-                      value={localChatTitle.replace(/^@/, '')}
-                      onChange={(e) => setLocalChatTitle(e.target.value)}
-                      placeholder="production_supergroup"
-                      className="flex-1 px-3 py-2 border border-slate-200 rounded-r-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Привязка к Telegram супергруппе проекта.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-rose-500" />
-                    Ваш логин в Telegram:
-                  </label>
-                  <input
-                    type="text"
-                    value={localTgHandle}
-                    onChange={(e) => setLocalTgHandle(e.target.value)}
-                    placeholder="kirillber"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Отображается в хедере напротив названия приложения с указанием роли.
-                  </p>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsTeamModalOpen(true)}
-                    className="w-full py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <Users className="w-4 h-4 text-indigo-600" />
-                    <span>Открыть расширенное окно участников</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {activeSubTab === 'bot' && (
-              <div className="space-y-4">
-                {/* Bot Status Banner */}
-                <div className="bg-gradient-to-r from-sky-50 to-indigo-50 border border-sky-200 rounded-xl p-3.5 text-sky-950 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="font-bold flex items-center gap-1.5 text-xs">
-                      <Bot className="w-4 h-4 text-sky-600" />
-                      <span>Telegram Бот и Архитектура топиков</span>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Синхронизация активна
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-sky-900/90 leading-relaxed">
-                    Каждая супергруппа Telegram — это изолированный проект со своей структурой из 9 топиков. Бот автоматически создает топики, принимает идеи через ЛС, удаляет мусор при создании созвонов и присылает напоминания за 1ч и 15м.
-                  </p>
-                </div>
-
-                {/* Scaffolding Section */}
-                <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-3">
-                  <div className="space-y-1">
-                    <h4 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                      <FolderKanban className="w-4 h-4 text-indigo-600" />
-                      <span>Авто-создание 9 топиков в чате (Скэффолдинг)</span>
-                    </h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      Введите Chat ID супергруппы (начинается с <code className="text-slate-700 bg-slate-100 px-1 py-0.5 rounded font-mono">-100...</code>) и название проекта. Бот вызовет метод <code className="text-slate-700 bg-slate-100 px-1 py-0.5 rounded font-mono">createForumTopic</code> для всех 9 этапов производства.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Chat ID группы:
-                      </label>
-                      <input
-                        type="text"
-                        value={scaffoldChatId}
-                        onChange={(e) => setScaffoldChatId(e.target.value)}
-                        placeholder="-1002145893201"
-                        className="w-full px-3 py-1.5 text-xs font-mono border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Название проекта / чата:
-                      </label>
-                      <input
-                        type="text"
-                        value={scaffoldChatTitle}
-                        onChange={(e) => setScaffoldChatTitle(e.target.value)}
-                        placeholder="Экспертный блог"
-                        className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {scaffoldSuccess && (
-                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-medium flex items-center gap-2 animate-in fade-in">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>{scaffoldSuccess}</span>
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    disabled={isScaffolding}
-                    onClick={() => {
-                      const numChatId = Number(scaffoldChatId);
-                      if (!numChatId) {
-                        alert('Пожалуйста, введите корректный числовой ID чата (напр. -1002145893201)');
-                        return;
-                      }
-                      setIsScaffolding(true);
-                      scaffoldProjectTopics(numChatId, scaffoldChatTitle.trim() || 'Новый проект');
-                      setScaffoldSuccess(`Топики для «${scaffoldChatTitle.trim() || 'Проект'}» успешно инициализированы!`);
-                      setTimeout(() => {
-                        setIsScaffolding(false);
-                      }, 1000);
-                      setTimeout(() => {
-                        setScaffoldSuccess(null);
-                      }, 4000);
-                    }}
-                    className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
-                  >
-                    {isScaffolding ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Создание топиков...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FolderPlus className="w-3.5 h-3.5" />
-                        <span>🚀 Развернуть 9 топиков в чате</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Topics Blueprint / Current Project Topics */}
-                <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                      <span>Структура топиков проекта ({currentProject?.title || projectName})</span>
-                    </h4>
-                    <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                      ID: {currentProject?.chatId || scaffoldChatId}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    {[
-                      { num: '1', title: '⚡ 1. Идеи и подборки', key: 'ideas', desc: 'Запись войсов в ЛС бота и референсы (YouTube/Instagram)', id: currentProject?.topics?.ideas || 101 },
-                      { num: '2', title: '📝 2. Сценарии', key: 'scripts', desc: 'Утверждение сценариев после одобрения идеи', id: currentProject?.topics?.scripts || 102 },
-                      { num: '3', title: '🎬 3. Съёмка', key: 'shooting', desc: 'Утверждённые сценарии, назначение даты съемки', id: currentProject?.topics?.shooting || 103 },
-                      { num: '4', title: '📁 4. Материалы', key: 'materials', desc: 'Загрузка дублей экспертом, фиксация ссылки на первое сообщение', id: currentProject?.topics?.materials || 104 },
-                      { num: '5', title: '📱 5. Рилсы', key: 'reels', desc: 'Смонтированные Reels, версионирование и рендеры', id: currentProject?.topics?.reels || 105 },
-                      { num: '6', title: '🎠 6. Карусели', key: 'carousels', desc: 'Готовые карусели и слайды', id: currentProject?.topics?.carousels || 106 },
-                      { num: '7', title: '👀 7. Сторис', key: 'stories', desc: 'Готовые сторис для прогрева и публикаций', id: currentProject?.topics?.stories || 107 },
-                      { num: '8', title: '📣 8. Публикации', key: 'publications', desc: 'Контент на публикацию, планировщик и буфер', id: currentProject?.topics?.publications || 108 },
-                      { num: '9', title: '🎙️ Созвоны', key: 'calls', desc: 'Автоочистка чата, карточка созвона, ЛС напоминания за 1ч и 15м', id: currentProject?.topics?.calls || 109 }
-                    ].map(top => (
-                      <div key={top.num} className="p-2 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between text-xs">
-                        <div className="min-w-0 pr-2">
-                          <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                            <span>{top.title}</span>
-                          </div>
-                          <div className="text-[10px] text-slate-500 truncate">{top.desc}</div>
-                        </div>
-                        <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded shrink-0">
-                          #{top.id}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Setup Checklist */}
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
-                  <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
-                    Чек-лист подключения Telegram группы:
-                  </h4>
-                  <ul className="space-y-1.5 text-[11px] text-slate-600">
-                    <li className="flex items-start gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                      <span>В группе включены <strong>Темы (Topics)</strong> в настройках Telegram.</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                      <span>Бот добавлен администратором с правами <strong>Управление темами</strong> (can_manage_topics).</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                      <span>Бот имеет право <strong>Удаление сообщений</strong> (can_delete_messages) для чистого создания созвонов.</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {activeSubTab === 'team' && (
-              <div className="space-y-4">
-                <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3 text-indigo-900 space-y-1">
-                  <div className="font-bold flex items-center gap-1.5 text-xs">
-                    <Shield className="w-4 h-4 text-indigo-700" />
-                    Управление участниками и назначение ролей
-                  </div>
-                  <p className="text-[11px] text-indigo-800 leading-relaxed">
-                    Продюсер может изменять роли для любого члена команды. Роль определяет доступные этапы конвейера и команды.
-                  </p>
-                </div>
-
-                <div className="space-y-2.5">
-                  {chatUsers.map(user => (
-                    <div 
-                      key={user.id}
-                      className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'}
-                          alt={user.name}
-                          className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
-                        />
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-900 text-xs">{user.name}</span>
-                            <span className="text-[11px] font-mono text-indigo-600">{user.telegramUsername}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500">
-                            {user.customTitle || 'Участник'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        <select
-                          value={user.role}
-                          onChange={(e) => updateUserRole(user.id, e.target.value as UserRole)}
-                          className="text-xs font-semibold px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
-                        >
-                          <option value="super_admin">Продюсер (Супер-админ)</option>
-                          <option value="expert">Эксперт</option>
-                          <option value="editor">Монтажёр</option>
-                          <option value="designer">Дизайнер</option>
-                          <option value="publisher">Публикатор / Ассистент</option>
-                        </select>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
+            {/* TAB 2: РИТМ НЕДЕЛИ */}
             {activeSubTab === 'schedule' && (
               <div className="space-y-4">
                 <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3 text-indigo-900 space-y-1">
@@ -669,7 +410,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
                     </button>
                   </div>
                   <p className="text-[11px] text-indigo-700 leading-relaxed">
-                    Дни съемок, монтажа и публикаций синхронизируются с календарным планом. Дни релизов строго зафиксированы: Вторник и Четверг.
+                    Дни съемок, монтажа и публикаций синхронизируются с календарным планом. Релизы в основную ленту фиксированы: Вторник и Четверг.
                   </p>
                 </div>
 
@@ -762,7 +503,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
                   </div>
                 </div>
 
-                {/* 4. Тестовые дни (пробные публикации) */}
+                {/* 4. Тестовые дни */}
                 <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
@@ -801,6 +542,133 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
               </div>
             )}
 
+            {/* TAB 3: КОМАНДА И РОЛИ (СИНХРОНИЗИРОВАНО С БАЗОЙ ТЕЛЕГРАМ) */}
+            {activeSubTab === 'team' && (
+              <div className="space-y-4">
+                <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3 text-indigo-900 space-y-1">
+                  <div className="font-bold flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-indigo-700" />
+                      Команда проекта «{currentProject?.title || 'Проект'}»
+                    </span>
+                    <span className="text-[10px] font-mono text-indigo-600 bg-white/80 px-2 py-0.5 rounded border border-indigo-200">
+                      Участников: {teamMembers.length}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-indigo-800 leading-relaxed">
+                    Назначьте роли для каждого члена команды. У одного участника может быть <strong>несколько ролей одновременно</strong> (права суммируются).
+                  </p>
+                </div>
+
+                {teamError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{teamError}</span>
+                  </div>
+                )}
+
+                {/* Team Members List */}
+                <div className="space-y-3">
+                  {teamMembers.map((member, index) => (
+                    <div 
+                      key={member.id}
+                      className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-3"
+                    >
+                      {/* Member Info Row */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+                              Имя / Никнейм
+                            </label>
+                            <input
+                              type="text"
+                              value={member.name}
+                              onChange={(e) => handleUpdateMemberName(member.id, e.target.value)}
+                              placeholder="Имя участника"
+                              className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+                              Telegram @username
+                            </label>
+                            <input
+                              type="text"
+                              value={member.username || ''}
+                              onChange={(e) => handleUpdateMemberUsername(member.id, e.target.value)}
+                              placeholder="@username"
+                              className="w-full px-2.5 py-1.5 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {teamMembers.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMember(member.id)}
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 mt-3 sm:mt-0"
+                            title="Удалить участника"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 8 Multi-Select Roles */}
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center justify-between">
+                          <span>Роли участника (нажмите для переключения):</span>
+                          <span className="text-indigo-600 lowercase font-normal">
+                            выбрано: {member.roles.length}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {TEAM_ROLES.map(role => {
+                            const isSelected = member.roles.includes(role.id);
+                            return (
+                              <button
+                                key={role.id}
+                                type="button"
+                                onClick={() => handleToggleMemberRole(member.id, role.id)}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'shadow-2xs ring-1 ring-black/10'
+                                    : 'bg-slate-100 hover:bg-slate-200/80 text-slate-600 border border-slate-200/60'
+                                }`}
+                                style={
+                                  isSelected
+                                    ? {
+                                        backgroundColor: role.bgLightColor,
+                                        color: role.badgeColor,
+                                      }
+                                    : undefined
+                                }
+                              >
+                                {isSelected && <Check className="w-3 h-3 shrink-0 stroke-[3]" />}
+                                <span>{role.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add Member Button */}
+                <button
+                  type="button"
+                  onClick={handleAddMember}
+                  className="w-full py-2.5 border border-dashed border-indigo-300 hover:border-indigo-500 bg-indigo-50/40 hover:bg-indigo-50 text-indigo-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Добавить участника команды</span>
+                </button>
+              </div>
+            )}
+
+            {/* TAB 4: СБРОС И ОЧИСТКА */}
             {activeSubTab === 'system' && (
               <div className="space-y-4">
                 <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-rose-900 space-y-1">
@@ -822,16 +690,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
 
                 {/* Card 1: Clear all tasks */}
                 <div className="p-4 bg-white border border-rose-200 rounded-xl shadow-2xs space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <h4 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                        <Trash2 className="w-4 h-4 text-rose-600" />
-                        <span>Полный сброс всех задач (очистить банк идей)</span>
-                      </h4>
-                      <p className="text-[11px] text-slate-500 leading-relaxed">
-                        Полностью удаляет ВСЕ карточки конвейера: идеи, сценарии, съемки и монтаж. Банк задач и конвейер станут совершенно пустыми.
-                      </p>
-                    </div>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <Trash2 className="w-4 h-4 text-rose-600" />
+                      <span>Полный сброс всех задач (очистить банк идей)</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Полностью удаляет ВСЕ карточки конвейера: идеи, сценарии, съемки и монтаж. Банк задач и конвейер станут совершенно пустыми.
+                    </p>
                   </div>
 
                   {confirmResetTasks ? (
@@ -933,13 +799,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, i
           </div>
         </form>
       </div>
-
-      {isTeamModalOpen && (
-        <TeamManagementModal
-          isOpen={isTeamModalOpen}
-          onClose={() => setIsTeamModalOpen(false)}
-        />
-      )}
     </div>,
     document.body
   );

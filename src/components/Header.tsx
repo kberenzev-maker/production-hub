@@ -76,10 +76,10 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
 
         {/* Right: User Profile Pill (TG Name & Roles) + Settings Gear */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* User Profile Pill */}
+          {/* User Profile Pill - Clean Minimal TG Login */}
           <div 
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#767680]/10 text-xs font-medium max-w-[180px] sm:max-w-[260px]"
-            title={`Пользователь: ${currentUser.name} (${currentUser.username || 'Telegram'})\nРоли: ${currentUser.roles.join(', ')}`}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#767680]/12 text-xs font-medium max-w-[200px]"
+            title={`Пользователь: ${currentUser.name} (${currentUser.username || 'Telegram'})\nРоли: ${currentUser.roles.map(r => TEAM_ROLES.find(tr => tr.id === r)?.label || r).join(', ')}`}
           >
             {/* Sync Pulse Dot */}
             <span 
@@ -89,34 +89,10 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
               title={syncStatus?.status === 'connected' ? 'База данных онлайн' : 'Синхронизация...'}
             />
             
-            {/* User name */}
-            <span className="font-semibold text-black truncate text-[11px] sm:text-[13px]">
-              {currentUser.name}
+            {/* User Login / Handle */}
+            <span className="font-semibold text-black truncate text-[12px] sm:text-[13px]">
+              {currentUser.username || currentUser.name}
             </span>
-
-            {/* Role Badges */}
-            <div className="flex items-center gap-1 shrink-0 overflow-hidden">
-              {currentUser.roles.slice(0, 2).map(r => {
-                const roleDef = TEAM_ROLES.find(tr => tr.id === r);
-                return (
-                  <span
-                    key={r}
-                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none"
-                    style={{
-                      backgroundColor: roleDef?.bgLightColor || 'rgba(0,122,255,0.1)',
-                      color: roleDef?.badgeColor || '#007AFF'
-                    }}
-                  >
-                    {roleDef?.shortLabel || r}
-                  </span>
-                );
-              })}
-              {currentUser.roles.length > 2 && (
-                <span className="text-[10px] text-[#8E8E93] font-bold">
-                  +{currentUser.roles.length - 2}
-                </span>
-              )}
-            </div>
           </div>
 
           {/* Settings Button */}
