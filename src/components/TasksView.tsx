@@ -25,6 +25,8 @@ export const TasksView: React.FC<TasksViewProps> = () => {
   const { 
     tasks, 
     currentExpertId, 
+    currentProjectId,
+    currentProject,
     addSubtask, 
     updateSubtaskStatus, 
     updateMultipleSubtasksStatus,
@@ -43,10 +45,17 @@ export const TasksView: React.FC<TasksViewProps> = () => {
   // New subtask inputs state
   const [newSubtaskInputs, setNewSubtaskInputs] = useState<Record<string, { title: string; assignedTo: string; assignedAvatar: string }>>({});
 
-  // Filter tasks to only non_content for current expert
+  const currentChatIdStr = currentProject ? String(currentProject.chatId) : '';
+  // Filter tasks to only non_content for current project / expert
   const nonContentTasks = useMemo(() => {
-    return tasks.filter(t => t.kind === 'non_content' && t.expertId === currentExpertId);
-  }, [tasks, currentExpertId]);
+    return tasks.filter(t => {
+      if (t.kind !== 'non_content') return false;
+      if (currentProjectId && (t.projectId === currentProjectId || t.projectId === currentChatIdStr)) {
+        return true;
+      }
+      return !t.projectId || t.expertId === currentExpertId;
+    });
+  }, [tasks, currentProjectId, currentChatIdStr, currentExpertId]);
 
   // Categories present
   const availableCategories = useMemo(() => {
@@ -97,9 +106,10 @@ export const TasksView: React.FC<TasksViewProps> = () => {
   };
 
   const handleAddSubtask = (taskId: string) => {
+    const defaultAssigneeName = currentProject?.members?.[0]?.name || chatUsers[0]?.name || 'Кирилл';
     const inputState = newSubtaskInputs[taskId] || { 
       title: '', 
-      assignedTo: chatUsers[0]?.name || 'Кирилл', 
+      assignedTo: defaultAssigneeName, 
       assignedAvatar: chatUsers[0]?.avatar || '' 
     };
 
@@ -263,9 +273,10 @@ export const TasksView: React.FC<TasksViewProps> = () => {
             const doneSubtasks = subtasks.filter(s => s.status === 'done').length;
             const totalSubtasks = subtasks.length;
 
+            const defaultAssigneeName = currentProject?.members?.[0]?.name || chatUsers[0]?.name || 'Кирилл';
             const inputState = newSubtaskInputs[task.id] || { 
               title: '', 
-              assignedTo: chatUsers[0]?.name || 'Кирилл', 
+              assignedTo: defaultAssigneeName, 
               assignedAvatar: chatUsers[0]?.avatar || '' 
             };
 

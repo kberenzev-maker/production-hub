@@ -567,7 +567,7 @@ export class ProductionTelegramBot {
       title: mainTitle,
       type: 'reels',
       kind: 'content',
-      expertId: 'vera',
+      expertId: session.userId ? String(session.userId) : 'expert',
       expertName: session.userName,
       projectId: String(session.chatId),
       scriptStatus: 'gray',

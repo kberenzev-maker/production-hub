@@ -98,7 +98,9 @@ export const PipelineView: React.FC = () => {
     tasks, 
     currentRole, 
     activeRole,
-    currentExpertId, 
+    currentExpertId,
+    currentProjectId,
+    currentProject, 
     setSelectedTaskId, 
     setEditingScriptTaskId,
     updateTaskDetails,
@@ -196,10 +198,15 @@ export const PipelineView: React.FC = () => {
     return KANBAN_COLUMNS;
   }, [isEditor, isDesigner]);
 
+  const currentChatIdStr = currentProject ? String(currentProject.chatId) : '';
   // Filter tasks
   const expertTasks = useMemo(() => {
     return tasks.filter(t => {
-      if (t.expertId !== currentExpertId || t.isArchived || t.kind === 'non_content') return false;
+      if (t.isArchived || t.kind === 'non_content') return false;
+      if (currentProjectId && t.projectId && t.projectId !== currentProjectId && t.projectId !== currentChatIdStr) {
+        return false;
+      }
+      if (!currentProjectId && t.expertId !== currentExpertId) return false;
       if (t.type !== 'reels' && t.type !== 'carousel' && t.type !== 'stories') return false;
       // Editor only sees Reels
       if (isEditor && t.type !== 'reels') return false;
@@ -207,7 +214,7 @@ export const PipelineView: React.FC = () => {
       if (isDesigner && t.type !== 'carousel' && t.type !== 'stories') return false;
       return true;
     });
-  }, [tasks, currentExpertId, isEditor, isDesigner]);
+  }, [tasks, currentProjectId, currentChatIdStr, currentExpertId, isEditor, isDesigner]);
 
   const visibleTasks = useMemo(() => {
     return expertTasks.filter(task => {

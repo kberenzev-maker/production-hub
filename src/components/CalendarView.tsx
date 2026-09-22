@@ -48,6 +48,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToContent 
     tasks, 
     calls, 
     currentExpertId, 
+    currentProjectId,
+    currentProject,
     setSelectedTaskId, 
     activeRole, 
     createCall,
@@ -70,14 +72,26 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToContent 
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
   const [selectedDayISO, setSelectedDayISO] = useState<string>(() => formatDateToISO(new Date()));
 
-  // Active expert tasks and calls
+  const currentChatIdStr = currentProject ? String(currentProject.chatId) : '';
+  // Active project / expert tasks and calls
   const expertTasks = useMemo(() => {
-    return tasks.filter(t => t.expertId === currentExpertId && !t.isArchived && !t.rejected);
-  }, [tasks, currentExpertId]);
+    return tasks.filter(t => {
+      if (t.isArchived || t.rejected) return false;
+      if (currentProjectId && (t.projectId === currentProjectId || t.projectId === currentChatIdStr)) {
+        return true;
+      }
+      return !t.projectId || t.expertId === currentExpertId;
+    });
+  }, [tasks, currentProjectId, currentChatIdStr, currentExpertId]);
 
   const expertCalls = useMemo(() => {
-    return calls.filter(c => c.expertId === currentExpertId);
-  }, [calls, currentExpertId]);
+    return calls.filter(c => {
+      if (currentProjectId && ((c as any).projectId === currentProjectId || (c as any).projectId === currentChatIdStr)) {
+        return true;
+      }
+      return !(c as any).projectId || c.expertId === currentExpertId;
+    });
+  }, [calls, currentProjectId, currentChatIdStr, currentExpertId]);
 
   // Navigate dates
   const handlePrev = () => {

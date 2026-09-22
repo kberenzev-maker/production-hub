@@ -23,6 +23,8 @@ export const ContentLayersView: React.FC = () => {
   const { 
     tasks, 
     currentExpertId, 
+    currentProjectId,
+    currentProject,
     activeRole, 
     updateTaskDetails, 
     scheduleShooting, 
@@ -92,14 +94,18 @@ export const ContentLayersView: React.FC = () => {
     setActiveLayersMap(prev => ({ ...prev, [taskId]: layerNum }));
   };
 
-  // Base list of tasks for current expert
+  const currentChatIdStr = currentProject ? String(currentProject.chatId) : '';
+  // Base list of tasks for current project / expert
   const expertTasks = useMemo(() => {
-    return tasks.filter(t => 
-      t.expertId === currentExpertId && 
-      t.kind !== 'non_content' && 
-      (t.type === 'reels' || t.type === 'carousel' || t.type === 'stories')
-    );
-  }, [tasks, currentExpertId]);
+    return tasks.filter(t => {
+      if (t.kind === 'non_content') return false;
+      if (t.type !== 'reels' && t.type !== 'carousel' && t.type !== 'stories') return false;
+      if (currentProjectId && (t.projectId === currentProjectId || t.projectId === currentChatIdStr)) {
+        return true;
+      }
+      return !t.projectId || t.expertId === currentExpertId;
+    });
+  }, [tasks, currentProjectId, currentChatIdStr, currentExpertId]);
 
   // Counts for Stage tabs
   const stageCounts = useMemo(() => {

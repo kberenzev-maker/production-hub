@@ -107,6 +107,8 @@ interface ProductionContextType {
     hasMediaReferences?: boolean;
     note?: string;
     targetDueDate?: string;
+    expertId?: string;
+    expertName?: string;
   }) => TaskCard;
   toggleNonContentTaskStatus: (taskId: string) => void;
   addSubtask: (taskId: string, title: string, assignedTo?: string, assignedAvatar?: string) => void;
@@ -733,8 +735,15 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Production Pulse analytics calculation
   const stats = useMemo<ProductionPulseStats>(() => {
+    const currentChatIdStr = currentProject ? String(currentProject.chatId) : '';
     // Exclude archived AND rejected tasks so they never count towards plan / progress
-    const expertTasks = tasks.filter(t => t.expertId === currentExpertId && !t.isArchived && !t.rejected);
+    const expertTasks = tasks.filter(t => {
+      if (t.isArchived || t.rejected) return false;
+      if (currentProjectId && (t.projectId === currentProjectId || t.projectId === currentChatIdStr)) {
+        return true;
+      }
+      return !t.projectId || t.expertId === currentExpertId;
+    });
     
     // Content tasks vs Non-content tasks
     const contentTasks = expertTasks.filter(t => t.kind !== 'non_content');
@@ -806,7 +815,7 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       nonContentTotalCount: nonContentTasks.length,
       nonContentDoneCount,
     };
-  }, [tasks, currentExpertId, norms]);
+  }, [tasks, currentProjectId, currentProject, currentExpertId, norms]);
 
   // Actions
   const createTask = ({ 
@@ -823,7 +832,9 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     hasVoiceNotes, 
     hasMediaReferences, 
     note, 
-    targetDueDate 
+    targetDueDate,
+    expertId,
+    expertName 
   }: { 
     title: string; 
     kind?: TaskKind;
@@ -838,14 +849,21 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     hasVoiceNotes?: boolean; 
     hasMediaReferences?: boolean; 
     note?: string; 
-    targetDueDate?: string; 
+    targetDueDate?: string;
+    expertId?: string;
+    expertName?: string;
   }) => {
     // Generate next unique #ID
     const existingIds = tasks.map(t => parseInt(t.id, 10)).filter(n => !isNaN(n));
     const nextNum = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 50;
     const newId = String(nextNum).padStart(3, '0');
     
-    const expert = INITIAL_EXPERTS.find(e => e.id === currentExpertId) || INITIAL_EXPERTS[0];
+    // Resolve project expert and default assignee from real project members
+    const projectMembers = currentProject?.members || [];
+    const projectExpert = projectMembers.find(m => m.roles.includes('expert')) || projectMembers[0];
+    const effectiveExpertName = expertName || projectExpert?.name || currentUser.name || 'Эксперт';
+    const effectiveExpertId = expertId || projectExpert?.id || (currentUser.id ? `tg-${currentUser.id}` : 'expert');
+    
     const defaultUser = chatUsers.find(u => u.name === assignedTo || u.name === ownerName) || chatUsers[0];
     
     const newTask: TaskCard = {
@@ -860,11 +878,11 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ownerName: kind === 'non_content' ? (ownerName || assignedTo || defaultUser?.name || 'Кирилл') : undefined,
       ownerAvatar: kind === 'non_content' ? (ownerAvatar || defaultUser?.avatar) : undefined,
       subtasks: [],
-      assignedTo: kind === 'non_content' ? assignedTo : undefined,
+      assignedTo: kind === 'non_content' ? (assignedTo || (projectMembers[0]?.name ? `${projectMembers[0].name}` : 'Вся команда')) : undefined,
       ideaDescription: note || '',
       targetDueDate: targetDueDate || undefined,
-      expertId: currentExpertId,
-      expertName: expert.name,
+      expertId: effectiveExpertId,
+      expertName: effectiveExpertName,
       scriptStatus: 'gray',
       shootingStatus: 'gray',
       editingStatus: 'gray',
@@ -874,7 +892,7 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       hasMediaReferences: !!hasMediaReferences,
       telegramTopicMsgLink: `https://t.me/c/2145893201/${1100 + nextNum}`,
       placement: 'unassigned',
-      projectId: currentProjectId,
+      projectId: currentProject ? String(currentProject.chatId) : currentProjectId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

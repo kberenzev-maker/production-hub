@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProduction } from '../context/ProductionContext';
-import { ContentType, TaskKind } from '../types';
+import { ContentType, TaskKind, ProjectMember, TEAM_ROLES } from '../types';
 import { 
   X, 
   Film, 
@@ -40,7 +40,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   defaultDate,
   defaultKind = 'content',
 }) => {
-  const { createTask, currentExpertId, experts, chatUsers } = useProduction();
+  const { createTask, currentProject, currentUser } = useProduction();
 
   const [taskKind, setTaskKind] = useState<TaskKind>(defaultKind);
 
@@ -52,10 +52,44 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [hasVoiceNotes, setHasVoiceNotes] = useState(false);
   const [hasMediaReferences, setHasMediaReferences] = useState(false);
 
+  // Real project members & expert resolution
+  const projectMembers = currentProject?.members || [];
+  const projectExperts = projectMembers.filter(m => m.roles.includes('expert'));
+
+  const getMemberLabel = (m: ProjectMember) => {
+    const rolesStr = m.roles.map(r => TEAM_ROLES.find(tr => tr.id === r)?.shortLabel || r).join(', ');
+    return rolesStr ? `${m.name} (${rolesStr})` : m.name;
+  };
+
+  const defaultExpert = projectExperts[0] || projectMembers[0];
+  const [selectedExpertId, setSelectedExpertId] = useState<string>(
+    defaultExpert?.id || 'expert'
+  );
+  const [selectedExpertName, setSelectedExpertName] = useState<string>(
+    defaultExpert?.name || currentUser.name || 'Эксперт'
+  );
+
+  const defaultAssignee = projectMembers.length > 0
+    ? getMemberLabel(projectMembers[0])
+    : (currentUser.name || 'Вся команда');
+
   // Non-content task state
   const [nonContentCategory, setNonContentCategory] = useState('Сайт');
-  const [assignedPerson, setAssignedPerson] = useState('Кирилл (Продюсер)');
+  const [assignedPerson, setAssignedPerson] = useState(defaultAssignee);
   const [nonContentStatus, setNonContentStatus] = useState<'todo' | 'in_progress' | 'done'>('todo');
+
+  useEffect(() => {
+    if (projectExperts.length > 0) {
+      setSelectedExpertId(projectExperts[0].id);
+      setSelectedExpertName(projectExperts[0].name);
+    } else if (projectMembers.length > 0) {
+      setSelectedExpertId(projectMembers[0].id);
+      setSelectedExpertName(projectMembers[0].name);
+    }
+    if (projectMembers.length > 0) {
+      setAssignedPerson(getMemberLabel(projectMembers[0]));
+    }
+  }, [currentProject]);
 
   if (!isOpen) return null;
 
@@ -74,6 +108,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       hasMediaReferences: taskKind === 'content' ? hasMediaReferences : false,
       note: description.trim(),
       targetDueDate: dueDate || undefined,
+      expertId: selectedExpertId,
+      expertName: selectedExpertName,
     });
 
     // Reset and close
@@ -260,13 +296,17 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 <select
                   value={assignedPerson}
                   onChange={(e) => setAssignedPerson(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium cursor-pointer"
                 >
-                  <option value="Кирилл (Продюсер)">Кирилл (Продюсер)</option>
-                  <option value="Вера (Эксперт)">Вера (Эксперт)</option>
-                  <option value="Арсений (Монтажер)">Арсений (Монтажер)</option>
-                  <option value="Марина (Дизайнер)">Марина (Дизайнер)</option>
-                  <option value="Вся команда">Вся команда</option>
+                  {projectMembers.map((m) => {
+                    const label = getMemberLabel(m);
+                    return (
+                      <option key={m.id} value={label}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                  <option value="Вся команда">👥 Вся команда</option>
                 </select>
               </div>
             ) : (
@@ -275,9 +315,32 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   <User className="w-3.5 h-3.5 text-slate-400" />
                   <span>Эксперт проекта:</span>
                 </label>
-                <div className="px-3 py-2 text-xs bg-slate-100/70 border border-slate-200 rounded-lg text-slate-700 font-medium">
-                  {experts.find(e => e.id === currentExpertId)?.name || 'Вера'}
-                </div>
+                {projectExperts.length > 1 ? (
+                  <select
+                    value={selectedExpertId}
+                    onChange={(e) => {
+                      const exp = projectExperts.find(m => m.id === e.target.value);
+                      if (exp) {
+                        setSelectedExpertId(exp.id);
+                        setSelectedExpertName(exp.name);
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold cursor-pointer"
+                  >
+                    {projectExperts.map(exp => (
+                      <option key={exp.id} value={exp.id}>
+                        {exp.name} {exp.username ? `(${exp.username})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="px-3 py-2 text-xs bg-slate-100/70 border border-slate-200 rounded-lg text-slate-800 font-semibold flex items-center justify-between">
+                    <span>{selectedExpertName}</span>
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                      Эксперт
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
