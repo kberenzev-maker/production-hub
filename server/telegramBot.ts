@@ -83,6 +83,13 @@ export class ProductionTelegramBot {
   private initBot() {
     try {
       this.bot = new Bot(this.token);
+
+      // HARD SECURITY LOCK: Permanently block deleteForumTopic API call
+      // Никакой код, обновление или процесс никогда не сможет удалить топик через бота
+      (this.bot.api as any).deleteForumTopic = async () => {
+        throw new Error('⛔ [SECURITY] Удаление топиков перманентно запрещено на уровне архитектуры Production Hub.');
+      };
+
       this.setupHandlers();
       this.start();
     } catch (err) {
