@@ -7,15 +7,15 @@
       "chatId": -1004292800394,
       "title": "test bot",
       "topics": {
-        "ideas": 15,
-        "scripts": 16,
-        "shooting": 17,
-        "materials": 18,
-        "reels": 19,
-        "carousels": 20,
-        "stories": 21,
-        "publications": 22,
-        "calls": 23
+        "ideas": 27,
+        "scripts": 28,
+        "shooting": 29,
+        "materials": 30,
+        "reels": 31,
+        "carousels": 32,
+        "stories": 33,
+        "publications": 34,
+        "calls": 35
       },
       "members": [
         {
@@ -24,16 +24,17 @@
           "name": "Кирилл Березнев",
           "username": "@kirillber",
           "roles": [
-            "producer"
+            "producer",
+            "expert"
           ],
           "isCreator": true
         }
       ],
-      "isSetupComplete": false,
+      "isSetupComplete": true,
       "createdAt": "2026-09-22T21:16:59.229Z",
-      "updatedAt": "2026-09-22T21:16:59.230Z"
+      "updatedAt": "2026-09-22T21:20:26.845Z"
     }
   ],
   "version": 1,
-  "updatedAt": "2026-09-22T21:16:59.230Z"
+  "updatedAt": "2026-09-22T21:19:21.812Z"
 }

@@ -8,15 +8,15 @@ export interface BotConfig {
 }
 
 export const TOPIC_DEFINITIONS = [
-  { key: 'ideas',        name: '1. ⚡ Идеи и подборки', iconColor: 0xFFD67E },
-  { key: 'scripts',      name: '2. 📝 Сценарии',        iconColor: 0x6FB9F0 },
-  { key: 'shooting',     name: '3. 🎬 Съёмка',          iconColor: 0xFB6F5F },
-  { key: 'materials',    name: '4. 📁 Материалы',       iconColor: 0xCB86DB },
-  { key: 'reels',        name: '5. 📱 Рилсы',           iconColor: 0x8EEE98 },
-  { key: 'carousels',    name: '6. 🎠 Карусели',       iconColor: 0xFF93B2 },
-  { key: 'stories',      name: '7. 👀 Сторис',          iconColor: 0xFFD67E },
-  { key: 'publications', name: '8. 📣 Публикации',      iconColor: 0x6FB9F0 },
-  { key: 'calls',        name: '🎙️ Созвоны',            iconColor: 0x8EEE98 },
+  { key: 'ideas',        name: 'Идеи и подборки', iconCustomEmojiId: '5312016608254762256', iconColor: 0xFFD67E }, // ⚡️
+  { key: 'scripts',      name: 'Сценарии',        iconCustomEmojiId: '5373251851074415873', iconColor: 0x6FB9F0 }, // 📝
+  { key: 'shooting',     name: 'Съёмка',          iconCustomEmojiId: '5368653135101310687', iconColor: 0xFB6F5F }, // 🎬
+  { key: 'materials',    name: 'Материалы',       iconCustomEmojiId: '5357315181649076022', iconColor: 0xCB86DB }, // 📁
+  { key: 'reels',        name: 'Рилсы',           iconCustomEmojiId: '5409357944619802453', iconColor: 0x8EEE98 }, // 📱
+  { key: 'carousels',    name: 'Карусели',       iconCustomEmojiId: '5310039132297242441', iconColor: 0xFF93B2 }, // 🎨
+  { key: 'stories',      name: 'Сторис',          iconCustomEmojiId: '5357121491508928442', iconColor: 0xFFD67E }, // 👀
+  { key: 'publications', name: 'Публикации',      iconCustomEmojiId: '5309984423003823246', iconColor: 0x6FB9F0 }, // 📣
+  { key: 'calls',        name: 'Созвоны',         iconCustomEmojiId: '5377544228505134960', iconColor: 0x8EEE98 }, // 🎙
 ] as const;
 
 interface IdeaSession {
@@ -604,9 +604,13 @@ export class ProductionTelegramBot {
       let lastError: any = null;
       for (const t of TOPIC_DEFINITIONS) {
         try {
-          const result = await this.bot.api.createForumTopic(chatId, t.name, {
+          const params: any = {
             icon_color: t.iconColor
-          });
+          };
+          if ((t as any).iconCustomEmojiId) {
+            params.icon_custom_emoji_id = (t as any).iconCustomEmojiId;
+          }
+          const result = await this.bot.api.createForumTopic(chatId, t.name, params);
           (topicMap as any)[t.key] = result.message_thread_id;
           console.log(`✅ [TelegramBot] Создан топик: ${t.name} (id: ${result.message_thread_id})`);
         } catch (err: any) {
