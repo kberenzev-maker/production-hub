@@ -35,7 +35,7 @@ class RealtimeSyncService {
         .then(res => res.json())
         .then(data => {
           if (data && (Array.isArray(data.tasks) || Array.isArray(data.calls))) {
-            this.callbacks.onInitialSnapshot?.(data);
+            this.callbacks.onStateSnapshot?.(data);
           }
         })
         .catch(() => {});

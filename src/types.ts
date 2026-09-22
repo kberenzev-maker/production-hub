@@ -76,7 +76,7 @@ export interface ProjectMember {
   isCreator?: boolean;
 }
 
-export type UserRole = TeamRole | 'super_admin';
+export type UserRole = TeamRole | 'super_admin' | 'editor' | 'publisher';
 
 export type TagColor = 
   | 'reels'           // Фиолетовый

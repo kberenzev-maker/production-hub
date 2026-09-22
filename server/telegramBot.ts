@@ -291,7 +291,7 @@ export class ProductionTelegramBot {
     // When bot is added via traditional group invite
     this.bot.on(':new_chat_members', async (ctx) => {
       const me = await ctx.api.getMe();
-      const botAdded = ctx.message.new_chat_members.some(u => u.id === me.id);
+      const botAdded = ctx.message?.new_chat_members?.some(u => u.id === me.id);
       if (!botAdded) return;
 
       const chat = ctx.chat;

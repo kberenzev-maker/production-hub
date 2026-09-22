@@ -466,10 +466,11 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         } else {
           setTasks([]);
         }
-        if (data.projects && Array.isArray(data.projects)) {
-          setProjects(data.projects);
-          if (data.projects.length > 0) {
-            setCurrentProjectId(prev => prev || data.projects[0].id);
+        const projs = data.projects;
+        if (projs && Array.isArray(projs)) {
+          setProjects(projs);
+          if (projs.length > 0 && projs[0]) {
+            setCurrentProjectId(prev => prev || projs[0]!.id);
           }
         }
         if (data.calls && Array.isArray(data.calls)) {

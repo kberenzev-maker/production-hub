@@ -142,14 +142,6 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
           initialTab={settingsTab}
         />
       )}
-
-      {/* Team Modal */}
-      {isTeamModalOpen && (
-        <TeamManagementModal 
-          isOpen={isTeamModalOpen}
-          onClose={() => setIsTeamModalOpen(false)}
-        />
-      )}
     </header>
   );
 };

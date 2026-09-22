@@ -32,7 +32,7 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ isOpen
     }
   };
 
-  const roleNames: Record<UserRole, { label: string; color: string; desc: string }> = {
+  const roleNames: Partial<Record<UserRole, { label: string; color: string; desc: string }>> = {
     super_admin: { label: 'Супер-админ (Продюсер)', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', desc: 'Полный доступ, управление проектами, ролями и конвейером' },
     expert: { label: 'Эксперт', color: 'bg-rose-100 text-rose-800 border-rose-200', desc: 'Утверждение сценариев и приемка готовых рендеров' },
     editor: { label: 'Монтажер', color: 'bg-slate-100 text-slate-800 border-slate-300', desc: 'Скачивание дублей, загрузка рендеров и обложек' },
@@ -94,7 +94,7 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ isOpen
                       <span className="text-xs text-indigo-600 font-mono font-semibold">{user.telegramUsername}</span>
                     </div>
                     <div className="text-[11px] text-slate-500">
-                      {user.customTitle || roleNames[user.role].desc}
+                      {user.customTitle || roleNames[user.role]?.desc || ''}
                     </div>
                   </div>
                 </div>
