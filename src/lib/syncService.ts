@@ -29,6 +29,17 @@ class RealtimeSyncService {
 
   public init(callbacks: SyncCallbacks) {
     this.callbacks = callbacks;
+    // Fast initial HTTP snapshot warmup
+    if (typeof window !== 'undefined') {
+      fetch('/api/sync/state')
+        .then(res => res.json())
+        .then(data => {
+          if (data && (Array.isArray(data.tasks) || Array.isArray(data.calls))) {
+            this.callbacks.onInitialSnapshot?.(data);
+          }
+        })
+        .catch(() => {});
+    }
     this.connect();
   }
 
@@ -184,8 +195,18 @@ class RealtimeSyncService {
   }
 
   private send(data: any) {
+    const payload = { ...data, clientId: this.clientId };
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ ...data, clientId: this.clientId }));
+      this.ws.send(JSON.stringify(payload));
+    } else {
+      // Fallback via HTTP POST
+      try {
+        fetch('/api/sync/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+      } catch (e) {}
     }
   }
 

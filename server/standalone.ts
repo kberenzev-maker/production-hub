@@ -213,6 +213,144 @@ app.post('/api/bot/scaffold', async (req, res) => {
   }
 });
 
+const handleSyncMessage = async (msg: any, excludeWs?: WebSocket) => {
+  if (!msg || !msg.type) return;
+  const activeDb = loadDatabase();
+
+  switch (msg.type) {
+    case 'GET_STATE': {
+      if (excludeWs && excludeWs.readyState === WebSocket.OPEN) {
+        excludeWs.send(JSON.stringify({
+          type: 'STATE_SNAPSHOT',
+          data: activeDb,
+          clientCount: clients.size
+        }));
+      }
+      break;
+    }
+
+    case 'TASK_UPSERT': {
+      const incomingTask = msg.task;
+      if (!incomingTask || !incomingTask.id) return;
+      const idx = activeDb.tasks.findIndex(t => t.id === incomingTask.id);
+      if (idx >= 0) {
+        activeDb.tasks[idx] = incomingTask;
+      } else {
+        activeDb.tasks.unshift(incomingTask);
+      }
+      saveDatabase(activeDb);
+      broadcast({
+        type: 'TASK_UPSERTED',
+        task: incomingTask,
+        clientId: msg.clientId
+      }, excludeWs);
+      break;
+    }
+
+    case 'TASK_DELETE': {
+      const taskId = msg.taskId;
+      if (!taskId) return;
+      activeDb.tasks = activeDb.tasks.filter(t => t.id !== taskId);
+      saveDatabase(activeDb);
+      broadcast({
+        type: 'TASK_DELETED',
+        taskId,
+        clientId: msg.clientId
+      }, excludeWs);
+      break;
+    }
+
+    case 'CALL_UPSERT': {
+      const incomingCall = msg.call;
+      if (!incomingCall || !incomingCall.id) return;
+      const idx = activeDb.calls.findIndex(c => c.id === incomingCall.id);
+      if (idx >= 0) {
+        activeDb.calls[idx] = incomingCall;
+      } else {
+        activeDb.calls.unshift(incomingCall);
+      }
+      saveDatabase(activeDb);
+      broadcast({
+        type: 'CALL_UPSERTED',
+        call: incomingCall,
+        clientId: msg.clientId
+      }, excludeWs);
+      break;
+    }
+
+    case 'CALL_DELETE': {
+      const callId = msg.callId;
+      if (!callId) return;
+      activeDb.calls = activeDb.calls.filter(c => c.id !== callId);
+      saveDatabase(activeDb);
+      broadcast({
+        type: 'CALL_DELETED',
+        callId,
+        clientId: msg.clientId
+      }, excludeWs);
+      break;
+    }
+
+    case 'SCAFFOLD_PROJECT': {
+      const chatId = msg.chatId || -1002145893201;
+      const chatTitle = msg.chatTitle || 'Новый проект';
+      await bot.scaffoldChatTopics(chatId, chatTitle);
+      break;
+    }
+
+    case 'UPDATE_PROJECT': {
+      const incomingProj = msg.project;
+      if (!incomingProj || !incomingProj.id) return;
+      const idx = activeDb.projects.findIndex(p => p.id === incomingProj.id);
+      if (idx >= 0) {
+        activeDb.projects[idx] = incomingProj;
+      } else {
+        activeDb.projects.push(incomingProj);
+      }
+      saveDatabase(activeDb);
+      broadcast({
+        type: 'PROJECT_UPSERTED',
+        project: incomingProj,
+        clientId: msg.clientId
+      }, excludeWs);
+      break;
+    }
+
+    case 'CLEAR_ALL_TASKS': {
+      activeDb.tasks = [];
+      saveDatabase(activeDb);
+      broadcast({
+        type: 'TASKS_CLEARED',
+        clientId: msg.clientId
+      }, excludeWs);
+      break;
+    }
+
+    case 'RESET_ALL_DATA': {
+      if (msg.initialTasks && msg.initialCalls) {
+        activeDb.tasks = msg.initialTasks;
+        activeDb.calls = msg.initialCalls;
+        saveDatabase(activeDb);
+        broadcast({
+          type: 'STATE_RESET',
+          data: activeDb,
+          clientId: msg.clientId
+        }, excludeWs);
+      }
+      break;
+    }
+  }
+};
+
+app.post('/api/sync/message', async (req, res) => {
+  try {
+    await handleSyncMessage(req.body);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Serve frontend static files from dist
 if (fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR));
@@ -239,129 +377,7 @@ wss.on('connection', (ws) => {
   ws.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw.toString());
-      const activeDb = loadDatabase();
-
-      switch (msg.type) {
-        case 'GET_STATE': {
-          ws.send(JSON.stringify({
-            type: 'STATE_SNAPSHOT',
-            data: activeDb,
-            clientCount: clients.size
-          }));
-          break;
-        }
-
-        case 'TASK_UPSERT': {
-          const incomingTask = msg.task;
-          if (!incomingTask || !incomingTask.id) return;
-          const idx = activeDb.tasks.findIndex(t => t.id === incomingTask.id);
-          if (idx >= 0) {
-            activeDb.tasks[idx] = incomingTask;
-          } else {
-            activeDb.tasks.unshift(incomingTask);
-          }
-          saveDatabase(activeDb);
-          broadcast({
-            type: 'TASK_UPSERTED',
-            task: incomingTask,
-            clientId: msg.clientId
-          }, ws);
-          break;
-        }
-
-        case 'TASK_DELETE': {
-          const taskId = msg.taskId;
-          if (!taskId) return;
-          activeDb.tasks = activeDb.tasks.filter(t => t.id !== taskId);
-          saveDatabase(activeDb);
-          broadcast({
-            type: 'TASK_DELETED',
-            taskId,
-            clientId: msg.clientId
-          }, ws);
-          break;
-        }
-
-        case 'CALL_UPSERT': {
-          const incomingCall = msg.call;
-          if (!incomingCall || !incomingCall.id) return;
-          const idx = activeDb.calls.findIndex(c => c.id === incomingCall.id);
-          if (idx >= 0) {
-            activeDb.calls[idx] = incomingCall;
-          } else {
-            activeDb.calls.unshift(incomingCall);
-          }
-          saveDatabase(activeDb);
-          broadcast({
-            type: 'CALL_UPSERTED',
-            call: incomingCall,
-            clientId: msg.clientId
-          }, ws);
-          break;
-        }
-
-        case 'CALL_DELETE': {
-          const callId = msg.callId;
-          if (!callId) return;
-          activeDb.calls = activeDb.calls.filter(c => c.id !== callId);
-          saveDatabase(activeDb);
-          broadcast({
-            type: 'CALL_DELETED',
-            callId,
-            clientId: msg.clientId
-          }, ws);
-          break;
-        }
-
-        case 'SCAFFOLD_PROJECT': {
-          const chatId = msg.chatId || -1002145893201;
-          const chatTitle = msg.chatTitle || 'Новый проект';
-          await bot.scaffoldChatTopics(chatId, chatTitle);
-          break;
-        }
-
-        case 'UPDATE_PROJECT': {
-          const incomingProj = msg.project;
-          if (!incomingProj || !incomingProj.id) return;
-          const idx = activeDb.projects.findIndex(p => p.id === incomingProj.id);
-          if (idx >= 0) {
-            activeDb.projects[idx] = incomingProj;
-          } else {
-            activeDb.projects.push(incomingProj);
-          }
-          saveDatabase(activeDb);
-          broadcast({
-            type: 'PROJECT_UPSERTED',
-            project: incomingProj,
-            clientId: msg.clientId
-          }, ws);
-          break;
-        }
-
-        case 'CLEAR_ALL_TASKS': {
-          activeDb.tasks = [];
-          saveDatabase(activeDb);
-          broadcast({
-            type: 'TASKS_CLEARED',
-            clientId: msg.clientId
-          }, ws);
-          break;
-        }
-
-        case 'RESET_ALL_DATA': {
-          if (msg.initialTasks && msg.initialCalls) {
-            activeDb.tasks = msg.initialTasks;
-            activeDb.calls = msg.initialCalls;
-            saveDatabase(activeDb);
-            broadcast({
-              type: 'STATE_RESET',
-              data: activeDb,
-              clientId: msg.clientId
-            }, ws);
-          }
-          break;
-        }
-      }
+      await handleSyncMessage(msg, ws);
     } catch (err) {
       console.error('[StandaloneServer] WebSocket message parse error:', err);
     }

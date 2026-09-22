@@ -88,8 +88,24 @@ export class ProductionTelegramBot {
     }
   }
 
+  private getAppButton(text: string = '📱 Открыть Production Hub'): InlineKeyboard {
+    const kb = new InlineKeyboard();
+    if (this.appUrl && this.appUrl.startsWith('https://')) {
+      return kb.webApp(text, this.appUrl);
+    }
+    return kb.url(text, this.appUrl || 'http://localhost:3000');
+  }
+
   private setupHandlers() {
     if (!this.bot) return;
+
+    // Log all incoming interactions
+    this.bot.use(async (ctx, next) => {
+      const from = ctx.from?.username ? `@${ctx.from.username}` : `id:${ctx.from?.id || 'unknown'}`;
+      const text = ctx.message?.text || ctx.callbackQuery?.data || '(event)';
+      console.log(`📩 [TelegramBot] Получено событие от ${from}: ${text}`);
+      await next();
+    });
 
     // Command /start (handles deep linking from group topics)
     this.bot.command('start', async (ctx) => {
@@ -130,10 +146,24 @@ export class ProductionTelegramBot {
       // Default /start
       await ctx.reply(
         `👋 Привет, ${userName}!\n` +
-        `Я координатор конвейера **Production Hub**.\n\n` +
-        `Я помогаю собирать идеи, уведомлять команду о сценариях, монтаже и напоминать о созвонах.`,
+        `Я координационный бот **Production Hub**.\n\n` +
+        `📱 Чтобы открыть веб-приложение, нажми кнопку ниже или кнопку **Меню** в левом нижнем углу:`,
         {
-          reply_markup: new InlineKeyboard().url('📱 Открыть Production Hub', this.appUrl)
+          reply_markup: this.getAppButton('📱 Открыть Production Hub')
+        }
+      );
+    });
+
+    // Command /help
+    this.bot.command('help', async (ctx) => {
+      await ctx.reply(
+        `ℹ️ **Production Hub — Справка**\n\n` +
+        `• 📱 Нажмите кнопку ниже, чтобы открыть Mini App управления производством контента\n` +
+        `• ⚡ Для подключения к проекту добавьте бота администратором в супергруппу с темами (топиками)\n` +
+        `• 🎙️ Чтобы надиктовать идею, перейдите по ссылке из топика «1. Идеи и подборки»`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: this.getAppButton('📱 Открыть Production Hub')
         }
       );
     });
@@ -177,8 +207,7 @@ export class ProductionTelegramBot {
 
           const topics = await this.scaffoldChatTopics(chat.id, chatTitle);
 
-          const kb = new InlineKeyboard()
-            .url('📱 Открыть Production Hub', this.appUrl);
+          const kb = this.getAppButton('📱 Открыть Production Hub');
 
           await ctx.reply(
             `🚀 **Конвейер полностью настроен!**\n\n` +
@@ -277,7 +306,7 @@ export class ProductionTelegramBot {
 
       await ctx.editMessageText('✅ **Идея успешно сохранена и отправлена в проект!**\nОна появилась в конвейере и в топике «1. ⚡ Идеи и подборки».', {
         parse_mode: 'Markdown',
-        reply_markup: new InlineKeyboard().url('📱 Открыть в Production Hub', this.appUrl)
+        reply_markup: this.getAppButton('📱 Открыть в Production Hub')
       });
     });
 
@@ -288,7 +317,13 @@ export class ProductionTelegramBot {
       if (!userId) return;
 
       const session = this.ideaSessions.get(userId);
-      if (!session) return;
+      if (!session) {
+        await ctx.reply(
+          `🎙️ Вы отправили голосовое сообщение. Чтобы записать идею в проект, перейдите по ссылке из топика «1. Идеи и подборки» или откройте приложение:`,
+          { reply_markup: this.getAppButton('📱 Открыть Production Hub') }
+        );
+        return;
+      }
 
       const voice = ctx.message.voice;
       const file = await ctx.getFile();
@@ -298,10 +333,10 @@ export class ProductionTelegramBot {
         id: `voice-${Date.now()}`,
         url: fileUrl,
         duration: voice.duration,
-        textTranscript: `[Голосовая заметка от ${session.userName} (${voice.duration} сек)]`
+        textTranscript: ''
       });
 
-      await ctx.reply(`🎙️ Голосовое принято (${voice.duration} сек). Можно присылать ещё или нажать «Завершить».`);
+      await ctx.reply('🎙️ Голосовая заметка принята! Можно наговорить ещё или нажать «Завершить».');
     });
 
     // Catch text & links in DM
@@ -311,7 +346,16 @@ export class ProductionTelegramBot {
       if (!userId) return;
 
       const session = this.ideaSessions.get(userId);
-      if (!session) return;
+      if (!session) {
+        await ctx.reply(
+          `👋 Я бот **Production Hub**.\n\n` +
+          `📱 Нажмите кнопку ниже, чтобы открыть веб-приложение, или кнопку **Меню** в левом нижнем углу:`,
+          {
+            reply_markup: this.getAppButton('📱 Открыть Production Hub')
+          }
+        );
+        return;
+      }
 
       const text = ctx.message.text;
       session.texts.push(text);
@@ -378,8 +422,7 @@ export class ProductionTelegramBot {
           (session.links.length > 0 ? `🔗 Референсов: ${session.links.length}\n` : '') +
           (session.texts.length > 1 ? `📝 Дополнительно: ${session.texts.slice(1).join(' ')}\n` : '');
 
-        const kb = new InlineKeyboard()
-          .url('📱 Открыть карточку', `${this.appUrl}`)
+        const kb = this.getAppButton('📱 Открыть карточку')
           .text('✅ Утвердить в сценарий', `approve_idea_${taskId}`);
 
         await this.bot.api.sendMessage(session.chatId, textMessage, {
@@ -497,8 +540,31 @@ export class ProductionTelegramBot {
       console.log('🤖 [TelegramBot] Бот запущен и слушает события...');
       this.bot.start({
         allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member'],
-        onStart: (info) => {
+        onStart: async (info) => {
           console.log(`🚀 [TelegramBot] Авторизован как @${info.username}`);
+          if (this.appUrl && this.appUrl.startsWith('https://')) {
+            try {
+              await this.bot?.api.setChatMenuButton({
+                menu_button: {
+                  type: 'web_app',
+                  text: 'Production Hub',
+                  web_app: { url: this.appUrl }
+                }
+              });
+              console.log(`📱 [TelegramBot] Меню-кнопка Web App установлена: ${this.appUrl}`);
+            } catch (e: any) {
+              console.warn('⚠️ [TelegramBot] Ошибка установки MenuButton:', e.message);
+            }
+          }
+          try {
+            await this.bot?.api.setMyCommands([
+              { command: 'start', description: 'Запустить бота и открыть Production Hub' },
+              { command: 'scaffold', description: 'Развернуть структуру 9 топиков в супергруппе' },
+              { command: 'help', description: 'Справка по конвейеру контента' }
+            ]);
+          } catch (e: any) {
+            console.warn('⚠️ [TelegramBot] Ошибка регистрации команд:', e.message);
+          }
         }
       }).catch(err => {
         console.error('❌ [TelegramBot] Ошибка polling:', err);
