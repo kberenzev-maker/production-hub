@@ -57,43 +57,30 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onOpe
 
       {/* Main Bar: height 48px */}
       <div className="h-12 max-w-7xl mx-auto px-4 flex items-center justify-between gap-3">
-        {/* Left: Project Selector (Telegram Chats) & Inline Expert Select */}
+        {/* Left: Project Selector (Telegram Chat) */}
         <div className="flex items-center gap-2 min-w-0">
-          <div className="relative inline-flex items-center min-w-0">
-            <select
-              id="header-project-select"
-              value={currentProjectId}
-              onChange={(e) => setCurrentProjectId(e.target.value)}
-              className="appearance-none bg-[#767680]/12 hover:bg-[#767680]/18 text-black text-[13px] sm:text-[14px] font-semibold py-1 pl-2.5 pr-6 rounded-full cursor-pointer focus:outline-none transition-colors truncate max-w-[150px] sm:max-w-[220px]"
-              title="Выбрать проект (чат)"
-            >
-              {projects.map(proj => (
-                <option key={proj.id} value={proj.id}>
-                  💬 {proj.title}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-[#8E8E93] absolute right-2 pointer-events-none" />
-          </div>
-
-          <span className="text-[#8E8E93] text-sm shrink-0">/</span>
-
-          {/* Native Inline Select */}
-          <div className="relative inline-flex items-center min-w-0">
-            <select
-              id="header-expert-select"
-              value={currentExpertId}
-              onChange={(e) => setCurrentExpertId(e.target.value)}
-              className="appearance-none bg-[#767680]/12 hover:bg-[#767680]/18 text-black text-[12px] sm:text-[13px] font-medium py-1 pl-2.5 pr-6 rounded-full cursor-pointer focus:outline-none transition-colors truncate max-w-[100px] sm:max-w-[140px]"
-            >
-              {experts.map(exp => (
-                <option key={exp.id} value={exp.id}>
-                  {exp.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-[#8E8E93] absolute right-2 pointer-events-none" />
-          </div>
+          {projects.length > 0 ? (
+            <div className="relative inline-flex items-center min-w-0">
+              <select
+                id="header-project-select"
+                value={currentProjectId}
+                onChange={(e) => setCurrentProjectId(e.target.value)}
+                className="appearance-none bg-[#767680]/12 hover:bg-[#767680]/18 text-black text-[13px] sm:text-[14px] font-semibold py-1.5 pl-3 pr-7 rounded-full cursor-pointer focus:outline-none transition-colors truncate max-w-[200px] sm:max-w-[280px]"
+                title="Выбрать проект (чат)"
+              >
+                {projects.map(proj => (
+                  <option key={proj.id} value={proj.id}>
+                    💬 {proj.title}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-[#8E8E93] absolute right-2.5 pointer-events-none" />
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#767680]/10 rounded-full text-[13px] font-medium text-[#8E8E93]">
+              <span>Нет проектов</span>
+            </div>
+          )}
         </div>
 
         {/* Right: Actions */}
@@ -115,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onOpe
             </span>
           </div>
 
-          {onOpenCreateTask && (
+          {onOpenCreateTask && projects.length > 0 && (
             <button
               type="button"
               onClick={onOpenCreateTask}

@@ -170,27 +170,8 @@ const INITIAL_CHAT_USERS: ChatUser[] = [
 ];
 
 export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: 'proj-vera',
-      chatId: -1002145893201,
-      title: 'Эксперт Вера | Запуск Октябрь',
-      topics: {
-        ideas: 1148,
-        scripts: 1149,
-        shooting: 1150,
-        materials: 1151,
-        reels: 1152,
-        carousels: 1153,
-        stories: 1154,
-        publications: 1155,
-        calls: 1156
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-  ]);
-  const [currentProjectId, setCurrentProjectId] = useState<string>('proj-vera');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string>('');
 
   const scaffoldProjectTopics = (chatId: number, chatTitle: string) => {
     syncService.sendScaffoldProject(chatId, chatTitle);
@@ -346,7 +327,7 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
       }
     } catch {}
-    return INITIAL_TASKS;
+    return [];
   });
 
   const [calls, setCalls] = useState<CallEvent[]>(() => {
@@ -362,7 +343,7 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
       }
     } catch {}
-    return INITIAL_CALLS;
+    return [];
   });
 
   // Direct sync helpers (Both WebSocket Realtime and Firestore)
@@ -431,17 +412,18 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           localStorage.removeItem(STORAGE_KEY_DB_CLEARED);
           setTasks(data.tasks);
         } else {
-          // If server database is brand new and empty, seed it with initial tasks
-          const isCleared = localStorage.getItem(STORAGE_KEY_DB_CLEARED) === 'true';
-          if (!isCleared && INITIAL_TASKS.length > 0) {
-            syncService.sendInitialSeedIfEmpty(INITIAL_TASKS, INITIAL_CALLS);
+          setTasks([]);
+        }
+        if (data.projects && Array.isArray(data.projects)) {
+          setProjects(data.projects);
+          if (data.projects.length > 0) {
+            setCurrentProjectId(prev => prev || data.projects[0].id);
           }
         }
-        if (data.projects && data.projects.length > 0) {
-          setProjects(data.projects);
-        }
-        if (data.calls && data.calls.length > 0) {
+        if (data.calls && Array.isArray(data.calls)) {
           setCalls(data.calls);
+        } else {
+          setCalls([]);
         }
       },
       onProjectUpsert: (incomingProj) => {
@@ -454,6 +436,7 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }
           return [...prev, incomingProj];
         });
+        setCurrentProjectId(prev => prev || incomingProj.id);
       },
       onTaskUpsert: (incomingTask) => {
         setTasks(prev => {

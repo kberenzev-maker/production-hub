@@ -11,6 +11,7 @@ import { BottomTabBar, MainTabType } from './components/BottomTabBar';
 import { TaskDetailModal } from './components/TaskDetailModal';
 import { ScriptEditorModal } from './components/ScriptEditorModal';
 import { CreateTaskModal } from './components/CreateTaskModal';
+import { EmptyProjectsOnboarding } from './components/EmptyProjectsOnboarding';
 
 const AppContent: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('plan');
@@ -20,6 +21,7 @@ const AppContent: React.FC = () => {
     tasks, 
     calls,
     currentExpertId, 
+    projects,
   } = useProduction();
 
   // Normalize active tab for bottom bar
@@ -44,57 +46,65 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F2F2F7] text-black flex flex-col font-sans">
-      {/* Header with Project & Expert Selector */}
+      {/* Header with Project Selector */}
       <Header
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
         onOpenCreateTask={() => setIsCreateTaskModalOpen(true)}
       />
 
-      {/* Main Content Area: screen padding strictly 16px (px-4), no horizontal overflow */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-4 space-y-5 pb-24">
-        {/* SCREEN 1: План & Календарь */}
-        {(currentTab === 'plan' || currentTab === 'calendar') && (
-          <div className="space-y-4">
-            <PulseWidget />
-            <CalendarView 
-              onNavigateToContent={(taskId) => {
-                setCurrentTab('content');
-              }}
-            />
-          </div>
-        )}
+        {projects.length === 0 ? (
+          <EmptyProjectsOnboarding />
+        ) : (
+          <>
+            {/* SCREEN 1: План & Календарь */}
+            {(currentTab === 'plan' || currentTab === 'calendar') && (
+              <div className="space-y-4">
+                <PulseWidget />
+                <CalendarView 
+                  onNavigateToContent={(taskId) => {
+                    setCurrentTab('content');
+                  }}
+                />
+              </div>
+            )}
 
-        {/* SCREEN 2: Контент (Послойный конвейер) */}
-        {(currentTab === 'content' || currentTab === 'pipeline') && (
-          <ContentLayersView />
-        )}
+            {/* SCREEN 2: Контент (Послойный конвейер) */}
+            {(currentTab === 'content' || currentTab === 'pipeline') && (
+              <ContentLayersView />
+            )}
 
-        {/* SCREEN 3: Задачи (Вне контента: организационные, технические и др.) */}
-        {currentTab === 'tasks' && (
-          <TasksView onOpenCreateTask={() => setIsCreateTaskModalOpen(true)} />
-        )}
+            {/* SCREEN 3: Задачи (Вне контента: организационные, технические и др.) */}
+            {currentTab === 'tasks' && (
+              <TasksView onOpenCreateTask={() => setIsCreateTaskModalOpen(true)} />
+            )}
 
-        {/* SCREEN 4: Публикация & 48ч тесты */}
-        {(currentTab === 'publish' || currentTab === 'publisher') && (
-          <PublisherView />
-        )}
+            {/* SCREEN 4: Публикация & 48ч тесты */}
+            {(currentTab === 'publish' || currentTab === 'publisher') && (
+              <PublisherView />
+            )}
 
-        {/* SCREEN 5: Созвоны */}
-        {currentTab === 'calls' && <CallsView />}
+            {/* SCREEN 5: Созвоны */}
+            {currentTab === 'calls' && <CallsView />}
+          </>
+        )}
       </main>
 
       {/* Fixed Bottom TabBar */}
-      <BottomTabBar
-        activeTab={activeMainTab}
-        onTabChange={(tab) => setCurrentTab(tab)}
-        badgeCounts={{
-          content: contentCount > 0 ? contentCount : undefined,
-          tasks: nonContentCount > 0 ? nonContentCount : undefined,
-          publish: publishCount > 0 ? publishCount : undefined,
-          calls: expertCalls.length > 0 ? expertCalls.length : undefined
-        }}
-      />
+      {projects.length > 0 && (
+        <BottomTabBar
+          activeTab={activeMainTab}
+          onTabChange={(tab) => setCurrentTab(tab)}
+          badgeCounts={{
+            content: contentCount > 0 ? contentCount : undefined,
+            tasks: nonContentCount > 0 ? nonContentCount : undefined,
+            publish: publishCount > 0 ? publishCount : undefined,
+            calls: expertCalls.length > 0 ? expertCalls.length : undefined
+          }}
+        />
+      )}
 
       {/* Modals */}
       <TaskDetailModal />

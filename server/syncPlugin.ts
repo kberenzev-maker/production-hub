@@ -42,46 +42,6 @@ function getEnv(key: string, defaultValue: string = ''): string {
   return defaultValue;
 }
 
-const DEFAULT_PROJECTS: Project[] = [
-  {
-    id: 'proj-vera',
-    chatId: -1002145893201,
-    title: 'Эксперт Вера | Запуск Октябрь',
-    topics: {
-      ideas: 1148,
-      scripts: 1149,
-      shooting: 1150,
-      materials: 1151,
-      reels: 1152,
-      carousels: 1153,
-      stories: 1154,
-      publications: 1155,
-      calls: 1156
-    },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'proj-artem',
-    chatId: -1002145893202,
-    title: 'Артём | Инвестиции',
-    topics: {
-      ideas: 201,
-      scripts: 202,
-      shooting: 203,
-      materials: 204,
-      reels: 205,
-      carousels: 206,
-      stories: 207,
-      publications: 208,
-      calls: 209
-    },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-];
-
-// Ensure database file exists
 function loadDatabase(): SyncDatabase {
   try {
     if (!fs.existsSync(DB_DIR)) {
@@ -91,8 +51,8 @@ function loadDatabase(): SyncDatabase {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.tasks)) {
-        if (!parsed.projects || !Array.isArray(parsed.projects) || parsed.projects.length === 0) {
-          parsed.projects = DEFAULT_PROJECTS;
+        if (!parsed.projects || !Array.isArray(parsed.projects)) {
+          parsed.projects = [];
         }
         return parsed;
       }
@@ -104,7 +64,7 @@ function loadDatabase(): SyncDatabase {
   const initialData: SyncDatabase = {
     tasks: [],
     calls: [],
-    projects: DEFAULT_PROJECTS,
+    projects: [],
     version: 1,
     updatedAt: new Date().toISOString()
   };
