@@ -3,6 +3,7 @@ import { useProduction } from '../context/ProductionContext';
 import { TEAM_ROLES } from '../types';
 import { ChevronDown, Settings, X, Eye } from 'lucide-react';
 import { SettingsModal } from './SettingsModal';
+import { UserAvatar } from './UserAvatar';
 
 interface HeaderProps {
   currentTab: string;
@@ -76,23 +77,30 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
 
         {/* Right: User Profile Pill (TG Name & Roles) + Settings Gear */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* User Profile Pill - Clean Minimal TG Login */}
+          {/* User Profile Pill - Clean Minimal TG Login with Avatar */}
           <div 
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#767680]/12 text-xs font-medium max-w-[200px]"
+            className="inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1 rounded-full bg-[#767680]/12 text-xs font-medium max-w-[220px]"
             title={`Пользователь: ${currentUser.name} (${currentUser.username || 'Telegram'})\nРоли: ${currentUser.roles.map(r => TEAM_ROLES.find(tr => tr.id === r)?.label || r).join(', ')}`}
           >
-            {/* Sync Pulse Dot */}
-            <span 
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                syncStatus?.status === 'connected' ? 'bg-[#34C759] animate-pulse' : 'bg-[#FF9500]'
-              }`} 
-              title={syncStatus?.status === 'connected' ? 'База данных онлайн' : 'Синхронизация...'}
+            <UserAvatar 
+              avatar={currentUser.avatar} 
+              name={currentUser.name} 
+              size="xs" 
+              showTooltip={false}
             />
             
             {/* User Login / Handle */}
             <span className="font-semibold text-black truncate text-[12px] sm:text-[13px]">
               {currentUser.username || currentUser.name}
             </span>
+
+            {/* Sync Pulse Dot */}
+            <span 
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                syncStatus?.status === 'connected' ? 'bg-[#34C759] animate-pulse' : 'bg-[#FF9500]'
+              }`} 
+              title={syncStatus?.status === 'connected' ? 'База данных онлайн' : 'Синхронизация...'}
+            />
           </div>
 
           {/* Settings Button */}

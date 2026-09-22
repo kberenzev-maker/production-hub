@@ -16,6 +16,7 @@ import {
   SlidersHorizontal
 } from 'lucide-react';
 import { CreateTaskModal } from './CreateTaskModal';
+import { UserAvatar } from './UserAvatar';
 
 interface TasksViewProps {
   onOpenCreateTask?: () => void;
@@ -29,11 +30,14 @@ export const TasksView: React.FC<TasksViewProps> = () => {
     currentProject,
     addSubtask, 
     updateSubtaskStatus, 
+    updateSubtaskAssignee,
     updateMultipleSubtasksStatus,
     deleteSubtask, 
     toggleNonContentTaskStatus,
     chatUsers
   } = useProduction();
+
+  const projectMembers = currentProject?.members || [];
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -106,11 +110,13 @@ export const TasksView: React.FC<TasksViewProps> = () => {
   };
 
   const handleAddSubtask = (taskId: string) => {
-    const defaultAssigneeName = currentProject?.members?.[0]?.name || chatUsers[0]?.name || 'Кирилл';
+    const defaultMember = currentProject?.members?.[0];
+    const defaultAssigneeName = defaultMember?.name || currentUser.name || 'Кирилл';
+    const defaultAssigneeAvatar = defaultMember?.avatar || currentUser.avatar || '';
     const inputState = newSubtaskInputs[taskId] || { 
       title: '', 
       assignedTo: defaultAssigneeName, 
-      assignedAvatar: chatUsers[0]?.avatar || '' 
+      assignedAvatar: defaultAssigneeAvatar 
     };
 
     if (!inputState.title.trim()) return;
@@ -273,11 +279,13 @@ export const TasksView: React.FC<TasksViewProps> = () => {
             const doneSubtasks = subtasks.filter(s => s.status === 'done').length;
             const totalSubtasks = subtasks.length;
 
-            const defaultAssigneeName = currentProject?.members?.[0]?.name || chatUsers[0]?.name || 'Кирилл';
+            const defaultMember = currentProject?.members?.[0];
+            const defaultAssigneeName = defaultMember?.name || currentUser.name || 'Кирилл';
+            const defaultAssigneeAvatar = defaultMember?.avatar || currentUser.avatar || '';
             const inputState = newSubtaskInputs[task.id] || { 
               title: '', 
               assignedTo: defaultAssigneeName, 
-              assignedAvatar: chatUsers[0]?.avatar || '' 
+              assignedAvatar: defaultAssigneeAvatar 
             };
 
             return (
@@ -337,13 +345,18 @@ export const TasksView: React.FC<TasksViewProps> = () => {
 
                   {/* Right: Subtasks Chevron */}
                   <div className="flex items-center gap-2 shrink-0 self-center">
-                    {task.ownerAvatar && (
-                      <img 
-                        src={task.ownerAvatar} 
-                        alt="" 
-                        className="w-6 h-6 rounded-full object-cover" 
-                      />
-                    )}
+                    {(() => {
+                      const rawName = task.ownerName || task.assignedTo || 'Участник';
+                      const cleanName = rawName.replace(/\s*\([^)]*\)/g, '').trim();
+                      const member = projectMembers.find(m => m.name === rawName || m.name === cleanName);
+                      return (
+                        <UserAvatar 
+                          avatar={task.ownerAvatar || member?.avatar || (member?.name === currentUser.name ? currentUser.avatar : undefined)}
+                          name={member?.name || cleanName || rawName}
+                          size="sm"
+                        />
+                      );
+                    })()}
                     <button
                       type="button"
                       onClick={() => toggleExpand(task.id)}
@@ -394,6 +407,36 @@ export const TasksView: React.FC<TasksViewProps> = () => {
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
+                            {/* Subtask Assignee Selector */}
+                            <div className="flex items-center gap-1.5 bg-slate-100/90 hover:bg-slate-200/90 rounded-full pl-1 pr-2 py-0.5 border border-black/5 transition-colors">
+                              <UserAvatar 
+                                avatar={st.assignedAvatar || projectMembers.find(m => m.name === st.assignedTo)?.avatar || (st.assignedTo === currentUser.name ? currentUser.avatar : undefined)} 
+                                name={st.assignedTo || 'Участник'} 
+                                size="xs" 
+                              />
+                              <select
+                                value={st.assignedTo || ''}
+                                onChange={(e) => {
+                                  const selectedName = e.target.value;
+                                  const member = projectMembers.find(m => m.name === selectedName);
+                                  updateSubtaskAssignee(task.id, st.id, selectedName, member?.avatar);
+                                }}
+                                className="text-[11px] font-medium bg-transparent text-slate-800 focus:outline-none cursor-pointer pr-1"
+                                title="Изменить ответственного за подзадачу"
+                              >
+                                {projectMembers.map(m => (
+                                  <option key={m.id} value={m.name}>
+                                    {m.name}
+                                  </option>
+                                ))}
+                                <option value="Вся команда">Вся команда</option>
+                                {!projectMembers.some(m => m.name === st.assignedTo) && st.assignedTo && st.assignedTo !== 'Вся команда' && (
+                                  <option value={st.assignedTo}>{st.assignedTo}</option>
+                                )}
+                              </select>
+                            </div>
+
+                            {/* Subtask Status Selector */}
                             <select
                               value={st.status}
                               onChange={(e) => updateSubtaskStatus(task.id, st.id, e.target.value as 'todo' | 'in_progress' | 'done')}
@@ -410,9 +453,6 @@ export const TasksView: React.FC<TasksViewProps> = () => {
                               <option value="done">Готово</option>
                             </select>
 
-                            {st.assignedAvatar && (
-                              <img src={st.assignedAvatar} alt="" className="w-5 h-5 rounded-full object-cover" />
-                            )}
                             <button
                               type="button"
                               onClick={() => deleteSubtask(task.id, st.id)}
@@ -445,10 +485,36 @@ export const TasksView: React.FC<TasksViewProps> = () => {
                         placeholder="Новая подзадача"
                         className="flex-1 text-[13px] bg-white border border-[#C6C6C8]/60 rounded-[8px] px-2.5 py-1 focus:outline-none"
                       />
+
+                      <select
+                        value={inputState.assignedTo}
+                        onChange={(e) => {
+                          const selectedName = e.target.value;
+                          const member = projectMembers.find(m => m.name === selectedName);
+                          setNewSubtaskInputs(prev => ({
+                            ...prev,
+                            [task.id]: { 
+                              ...inputState, 
+                              assignedTo: selectedName, 
+                              assignedAvatar: member?.avatar || '' 
+                            }
+                          }));
+                        }}
+                        className="text-[11px] font-medium bg-white border border-[#C6C6C8]/60 rounded-[8px] px-2 py-1 focus:outline-none cursor-pointer text-slate-800"
+                        title="Назначить ответственного"
+                      >
+                        {projectMembers.map(m => (
+                          <option key={m.id} value={m.name}>
+                            {m.name}
+                          </option>
+                        ))}
+                        <option value="Вся команда">Вся команда</option>
+                      </select>
+
                       <button
                         type="button"
                         onClick={() => handleAddSubtask(task.id)}
-                        className="text-[13px] text-[#007AFF] font-semibold px-2 py-1 cursor-pointer"
+                        className="text-[13px] text-[#007AFF] font-semibold px-2 py-1 cursor-pointer shrink-0"
                       >
                         Добавить
                       </button>

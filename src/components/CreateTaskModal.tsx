@@ -70,7 +70,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   );
 
   const defaultAssignee = projectMembers.length > 0
-    ? getMemberLabel(projectMembers[0])
+    ? projectMembers[0].name
     : (currentUser.name || 'Вся команда');
 
   // Non-content task state
@@ -87,7 +87,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       setSelectedExpertName(projectMembers[0].name);
     }
     if (projectMembers.length > 0) {
-      setAssignedPerson(getMemberLabel(projectMembers[0]));
+      setAssignedPerson(projectMembers[0].name);
     }
   }, [currentProject]);
 
@@ -97,12 +97,16 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     e.preventDefault();
     if (!title.trim()) return;
 
+    const chosenMember = projectMembers.find(m => m.name === assignedPerson);
+
     createTask({
       title: title.trim(),
       kind: taskKind,
       type: contentType,
       nonContentCategory: taskKind === 'non_content' ? nonContentCategory : undefined,
       assignedTo: taskKind === 'non_content' ? assignedPerson : undefined,
+      ownerName: taskKind === 'non_content' ? assignedPerson : undefined,
+      ownerAvatar: taskKind === 'non_content' ? chosenMember?.avatar : undefined,
       nonContentStatus: taskKind === 'non_content' ? nonContentStatus : undefined,
       hasVoiceNotes: taskKind === 'content' ? hasVoiceNotes : false,
       hasMediaReferences: taskKind === 'content' ? hasMediaReferences : false,
@@ -298,14 +302,11 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   onChange={(e) => setAssignedPerson(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium cursor-pointer"
                 >
-                  {projectMembers.map((m) => {
-                    const label = getMemberLabel(m);
-                    return (
-                      <option key={m.id} value={label}>
-                        {label}
-                      </option>
-                    );
-                  })}
+                  {projectMembers.map((m) => (
+                    <option key={m.id} value={m.name}>
+                      {m.name}{m.username ? ` (${m.username})` : ''}
+                    </option>
+                  ))}
                   <option value="Вся команда">👥 Вся команда</option>
                 </select>
               </div>

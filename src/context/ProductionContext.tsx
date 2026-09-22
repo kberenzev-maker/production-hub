@@ -29,6 +29,7 @@ interface ProductionContextType {
     name: string;
     username?: string;
     roles: TeamRole[];
+    avatar?: string;
   };
   scaffoldProjectTopics: (chatId: number, chatTitle: string) => void;
 
@@ -113,6 +114,7 @@ interface ProductionContextType {
   toggleNonContentTaskStatus: (taskId: string) => void;
   addSubtask: (taskId: string, title: string, assignedTo?: string, assignedAvatar?: string) => void;
   updateSubtaskStatus: (taskId: string, subtaskId: string, status: 'todo' | 'in_progress' | 'done') => void;
+  updateSubtaskAssignee: (taskId: string, subtaskId: string, assignedTo: string, assignedAvatar?: string) => void;
   updateMultipleSubtasksStatus: (taskId: string, subtaskIds: string[], status: 'todo' | 'in_progress' | 'done') => void;
   deleteSubtask: (taskId: string, subtaskId: string) => void;
   saveScriptDraft: (taskId: string, text: string) => void;
@@ -235,13 +237,52 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ? matchedMember.roles 
       : (currentProject?.members?.[0]?.roles || ['producer']);
 
+    const avatar = tgUser?.photo_url || matchedMember?.avatar;
+
     return {
       id: tgUser?.id,
       name,
       username,
-      roles
+      roles,
+      avatar
     };
   }, [currentProject]);
+
+  // Auto-sync real Telegram user details (avatar, username, id) to project members
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+    if (!tgUser || !currentProject || !currentProject.members) return;
+
+    const matchedMember = currentProject.members.find(m => 
+      (tgUser.id && m.telegramUserId === tgUser.id) ||
+      (tgUser.username && m.username?.toLowerCase() === `@${tgUser.username.toLowerCase()}`) ||
+      (tgUser.username && m.username?.toLowerCase() === tgUser.username.toLowerCase()) ||
+      (m.isCreator && !m.telegramUserId)
+    );
+
+    if (matchedMember) {
+      let changed = false;
+      const updatedMember = { ...matchedMember };
+      if (tgUser.photo_url && matchedMember.avatar !== tgUser.photo_url) {
+        updatedMember.avatar = tgUser.photo_url;
+        changed = true;
+      }
+      if (tgUser.id && !matchedMember.telegramUserId) {
+        updatedMember.telegramUserId = tgUser.id;
+        changed = true;
+      }
+      if (tgUser.username && !matchedMember.username) {
+        updatedMember.username = `@${tgUser.username}`;
+        changed = true;
+      }
+
+      if (changed) {
+        const nextMembers = currentProject.members.map(m => m.id === matchedMember.id ? updatedMember : m);
+        updateProjectMembers(currentProject.id, nextMembers);
+      }
+    }
+  }, [currentProject?.id]);
 
   const scaffoldProjectTopics = (chatId: number, chatTitle: string) => {
     syncService.sendScaffoldProject(chatId, chatTitle);
@@ -864,7 +905,17 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const effectiveExpertName = expertName || projectExpert?.name || currentUser.name || 'Эксперт';
     const effectiveExpertId = expertId || projectExpert?.id || (currentUser.id ? `tg-${currentUser.id}` : 'expert');
     
-    const defaultUser = chatUsers.find(u => u.name === assignedTo || u.name === ownerName) || chatUsers[0];
+    // Match member for assignee/owner to get accurate name and avatar from real project roster
+    const rawAssigned = assignedTo || ownerName;
+    const cleanAssigned = rawAssigned?.replace(/\s*\([^)]*\)/g, '').trim();
+    const matchedMember = projectMembers.find(m => 
+      m.name === rawAssigned || 
+      m.name === cleanAssigned || 
+      (cleanAssigned && m.name.toLowerCase().includes(cleanAssigned.toLowerCase())) ||
+      (m.username && cleanAssigned?.includes(m.username))
+    );
+    const finalOwnerName = matchedMember?.name || cleanAssigned || currentUser.name || 'Кирилл';
+    const finalAvatar = ownerAvatar || matchedMember?.avatar || (finalOwnerName === currentUser.name ? currentUser.avatar : undefined);
     
     const newTask: TaskCard = {
       id: newId,
@@ -875,10 +926,10 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       nonContentStatus: kind === 'non_content' ? nonContentStatus : undefined,
       goal: kind === 'non_content' ? (goal?.trim() || title.trim()) : undefined,
       description: kind === 'non_content' ? (description?.trim() || note?.trim() || '') : undefined,
-      ownerName: kind === 'non_content' ? (ownerName || assignedTo || defaultUser?.name || 'Кирилл') : undefined,
-      ownerAvatar: kind === 'non_content' ? (ownerAvatar || defaultUser?.avatar) : undefined,
+      ownerName: kind === 'non_content' ? finalOwnerName : undefined,
+      ownerAvatar: kind === 'non_content' ? finalAvatar : undefined,
       subtasks: [],
-      assignedTo: kind === 'non_content' ? (assignedTo || (projectMembers[0]?.name ? `${projectMembers[0].name}` : 'Вся команда')) : undefined,
+      assignedTo: kind === 'non_content' ? finalOwnerName : undefined,
       ideaDescription: note || '',
       targetDueDate: targetDueDate || undefined,
       expertId: effectiveExpertId,
@@ -910,13 +961,17 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const addSubtask = (taskId: string, subtaskTitle: string, assignedTo?: string, assignedAvatar?: string) => {
     if (!subtaskTitle.trim()) return;
-    const defaultUser = chatUsers.find(u => u.name === assignedTo) || chatUsers[0];
+    const projectMembers = currentProject?.members || [];
+    const matchedMember = projectMembers.find(m => m.name === assignedTo);
+    const resolvedAvatar = assignedAvatar || matchedMember?.avatar || (assignedTo === currentUser.name ? currentUser.avatar : undefined);
+    const finalAssigneeName = assignedTo || projectMembers[0]?.name || currentUser.name || 'Кирилл';
+
     const newSubtask: SubTask = {
       id: `sub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       title: subtaskTitle.trim(),
       status: 'todo',
-      assignedTo: assignedTo || defaultUser?.name || 'Кирилл',
-      assignedAvatar: assignedAvatar || defaultUser?.avatar,
+      assignedTo: finalAssigneeName,
+      assignedAvatar: resolvedAvatar,
       createdAt: new Date().toISOString(),
     };
 
@@ -943,6 +998,22 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         subtasks: updatedSubtasks,
         nonContentStatus: nextStatus,
         editingStatus: 'gray',
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  };
+
+  const updateSubtaskAssignee = (taskId: string, subtaskId: string, assignedTo: string, assignedAvatar?: string) => {
+    const projectMembers = currentProject?.members || [];
+    const matchedMember = projectMembers.find(m => m.name === assignedTo);
+    const resolvedAvatar = assignedAvatar || matchedMember?.avatar || (assignedTo === currentUser.name ? currentUser.avatar : undefined);
+
+    updateTaskInState(taskId, t => {
+      const currentSubtasks = t.subtasks || [];
+      const updatedSubtasks = currentSubtasks.map(st => st.id === subtaskId ? { ...st, assignedTo, assignedAvatar: resolvedAvatar } : st);
+      return {
+        ...t,
+        subtasks: updatedSubtasks,
         updatedAt: new Date().toISOString(),
       };
     });
@@ -1648,6 +1719,7 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         createTask,
         addSubtask,
         updateSubtaskStatus,
+        updateSubtaskAssignee,
         updateMultipleSubtasksStatus,
         deleteSubtask,
         toggleNonContentTaskStatus,
