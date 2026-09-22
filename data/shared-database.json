@@ -1,7 +1,39 @@
 {
   "tasks": [],
   "calls": [],
-  "projects": [],
+  "projects": [
+    {
+      "id": "proj-1790111819229",
+      "chatId": -1004292800394,
+      "title": "test bot",
+      "topics": {
+        "ideas": 15,
+        "scripts": 16,
+        "shooting": 17,
+        "materials": 18,
+        "reels": 19,
+        "carousels": 20,
+        "stories": 21,
+        "publications": 22,
+        "calls": 23
+      },
+      "members": [
+        {
+          "id": "tg-1315106036",
+          "telegramUserId": 1315106036,
+          "name": "Кирилл Березнев",
+          "username": "@kirillber",
+          "roles": [
+            "producer"
+          ],
+          "isCreator": true
+        }
+      ],
+      "isSetupComplete": false,
+      "createdAt": "2026-09-22T21:16:59.229Z",
+      "updatedAt": "2026-09-22T21:16:59.230Z"
+    }
+  ],
   "version": 1,
-  "updatedAt": "2026-09-23T03:52:00.000Z"
+  "updatedAt": "2026-09-22T21:16:59.230Z"
 }

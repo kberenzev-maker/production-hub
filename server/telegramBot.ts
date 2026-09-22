@@ -106,6 +106,11 @@ export class ProductionTelegramBot {
   private setupHandlers() {
     if (!this.bot) return;
 
+    // Error boundary: prevent polling crash on unhandled errors
+    this.bot.catch((err) => {
+      console.error('❌ [TelegramBot] Перехвачена ошибка в обработчике:', err.message || err);
+    });
+
     // Log all incoming interactions
     this.bot.use(async (ctx, next) => {
       const from = ctx.from?.username ? `@${ctx.from.username}` : `id:${ctx.from?.id || 'unknown'}`;
@@ -150,13 +155,14 @@ export class ProductionTelegramBot {
         return;
       }
 
-      // Default /start
+      // Default /start (check if private chat or group invocation)
+      const isPrivate = ctx.chat.type === 'private';
       await ctx.reply(
         `👋 Привет, ${userName}!\n` +
         `Я координационный бот **Production Hub**.\n\n` +
         `📱 Чтобы открыть веб-приложение, нажми кнопку ниже или кнопку **Меню** в левом нижнем углу:`,
         {
-          reply_markup: this.getAppButton('📱 Открыть Production Hub', true)
+          reply_markup: this.getAppButton('📱 Открыть Production Hub', isPrivate)
         }
       );
     });
@@ -182,9 +188,70 @@ export class ProductionTelegramBot {
         return;
       }
 
-      await ctx.reply(`🚀 Запускаю создание структуры из 9 топиков конвейера для проекта «${ctx.chat.title || 'Проект'}»...`);
-      await this.scaffoldChatTopics(ctx.chat.id, ctx.chat.title || 'Проект');
-      await ctx.reply('✅ Все 9 топиков успешно созданы! Проект синхронизирован с Production Hub.');
+      const chatTitle = ctx.chat.title || 'Проект';
+      const fromUser = ctx.from;
+      const creatorName = `${fromUser?.first_name || ''} ${fromUser?.last_name || ''}`.trim() || fromUser?.username || 'Администратор';
+      const creatorUsername = fromUser?.username ? `@${fromUser.username}` : undefined;
+
+      const creatorMember: ProjectMember = {
+        id: `tg-${fromUser?.id || Date.now()}`,
+        telegramUserId: fromUser?.id,
+        name: creatorName,
+        username: creatorUsername,
+        roles: ['producer'],
+        isCreator: true
+      };
+
+      try {
+        await ctx.reply(`🚀 Запускаю создание структуры из 9 топиков конвейера для проекта «${chatTitle}»...`);
+        const topics = await this.scaffoldChatTopics(ctx.chat.id, chatTitle);
+
+        this.onProjectScaffolded?.(ctx.chat.id, chatTitle, topics, [creatorMember], false);
+
+        const kb = this.getAppButton('📱 Определить роли команды');
+
+        await ctx.reply(
+          `🎉 **Production Hub подключен к проекту «${chatTitle}»!**\n\n` +
+          `✅ Все 9 топиков успешно созданы!\n` +
+          `👤 **Создатель:** ${creatorName} (${creatorUsername || 'Продюсер / админ'})\n\n` +
+          `⚠️ **Следующий шаг:** перейдите в приложение, чтобы определить роли участников команды:\n` +
+          `• Эксперт\n` +
+          `• Продюсер / админ\n` +
+          `• Проектный менеджер\n` +
+          `• Рилсмейкер\n` +
+          `• Дизайнер\n` +
+          `• Оператор\n` +
+          `• СММ\n` +
+          `• Ассистент\n\n` +
+          `*Идентификация проекта завершится после назначения ролей 👇*`,
+          { parse_mode: 'Markdown', reply_markup: kb }
+        );
+      } catch (err: any) {
+        console.error('[TelegramBot] Ошибка создания топиков по команде:', err);
+        const errMsg = err?.description || err?.message || String(err);
+        let instructions = '';
+
+        if (errMsg.includes('not a forum') || errMsg.includes('TOPICS_RESTRICTED')) {
+          instructions = 
+            `💡 **В этой группе выключены темы (форум).**\n\n` +
+            `👉 **Как исправить:**\n` +
+            `1. Зайдите в **«Настройки группы»** (Редактировать / значок карандаша).\n` +
+            `2. Найдите пункт **«Темы» (Topics)** и включите его.\n` +
+            `3. Убедитесь, что у бота есть право **«Управление темами»** в списке администраторов.\n\n` +
+            `После включения отправьте команду \`/scaffold\` ещё раз!`;
+        } else if (errMsg.includes('not enough rights') || errMsg.includes('CHAT_ADMIN_REQUIRED')) {
+          instructions = 
+            `💡 **Боту не хватает прав администратора.**\n\n` +
+            `👉 **Как исправить:**\n` +
+            `1. Откройте профиль бота в группе.\n` +
+            `2. Сделайте его **Администратором** и включите галочку **«Управление темами»**.\n\n` +
+            `После этого отправьте команду \`/scaffold\` ещё раз!`;
+        } else {
+          instructions = `⚠️ **Не удалось создать топики:** ${errMsg}\n\nУбедитесь, что темы в группе включены и у бота есть права администратора.`;
+        }
+
+        await ctx.reply(instructions, { parse_mode: 'Markdown' });
+      }
     });
 
     // Auto-detect when bot is added to a group or promoted to admin
@@ -199,11 +266,21 @@ export class ProductionTelegramBot {
       console.log(`🔔 [TelegramBot] Статус бота в группе «${chat.title}» (${chat.id}) изменился: ${oldStatus} -> ${status}`);
 
       if (status === 'administrator') {
-        const canManageTopics = (update.new_chat_member as any).can_manage_topics;
         const chatTitle = chat.title || 'Новый проект';
+        const addedByUser = update.from;
+        const creatorName = `${addedByUser.first_name || ''} ${addedByUser.last_name || ''}`.trim() || addedByUser.username || 'Администратор';
+        const creatorUsername = addedByUser.username ? `@${addedByUser.username}` : undefined;
 
-        if (canManageTopics) {
-          // Бот уже имеет права управления темами -> Автоматически разворачиваем структуру!
+        const creatorMember: ProjectMember = {
+          id: `tg-${addedByUser.id}`,
+          telegramUserId: addedByUser.id,
+          name: creatorName,
+          username: creatorUsername,
+          roles: ['producer'],
+          isCreator: true
+        };
+
+        try {
           await ctx.reply(
             `🎉 **Production Hub подключен к проекту «${chatTitle}»!**\n\n` +
             `✅ Права администратора получены.\n` +
@@ -211,19 +288,6 @@ export class ProductionTelegramBot {
             `⚡ Автоматически создаю **9 рабочих топиков** конвейера...`,
             { parse_mode: 'Markdown' }
           );
-
-          const addedByUser = update.from;
-          const creatorName = `${addedByUser.first_name || ''} ${addedByUser.last_name || ''}`.trim() || addedByUser.username || 'Администратор';
-          const creatorUsername = addedByUser.username ? `@${addedByUser.username}` : undefined;
-
-          const creatorMember: ProjectMember = {
-            id: `tg-${addedByUser.id}`,
-            telegramUserId: addedByUser.id,
-            name: creatorName,
-            username: creatorUsername,
-            roles: ['producer'],
-            isCreator: true
-          };
 
           const topics = await this.scaffoldChatTopics(chat.id, chatTitle);
 
@@ -233,7 +297,7 @@ export class ProductionTelegramBot {
           const kb = this.getAppButton('📱 Определить роли команды');
 
           await ctx.reply(
-            `🎉 **Production Hub подключен к проекту «${chatTitle}»!**\n\n` +
+            `🎉 **Топики успешно созданы!**\n\n` +
             `✅ Создано 9 рабочих топиков конвейера.\n` +
             `👤 **Создатель:** ${creatorName} (${creatorUsername || 'Продюсер / админ'})\n\n` +
             `⚠️ **Следующий шаг:** перейдите в приложение, чтобы определить роли участников команды:\n` +
@@ -248,18 +312,28 @@ export class ProductionTelegramBot {
             `*Идентификация проекта завершится после назначения ролей 👇*`,
             { parse_mode: 'Markdown', reply_markup: kb }
           );
-        } else {
-          const kb = new InlineKeyboard()
-            .text('🚀 Развернуть 9 топиков конвейера', `scaffold_here_${chat.id}`);
+        } catch (err: any) {
+          console.warn('[TelegramBot] Не удалось автоматически создать топики при назначении админом:', err?.message || err);
+          const errMsg = err?.description || err?.message || String(err);
+          let instructions = '';
 
-          await ctx.reply(
-            `👋 **Production Hub подключен к проекту «${chatTitle}»!**\n\n` +
-            `⚠️ Чтобы я автоматически создал 9 топиков, включите мне разрешение:\n` +
-            `• 🏷️ **Управление темами** (can_manage_topics)\n` +
-            `• 🗑️ **Удаление сообщений** (can_delete_messages)\n\n` +
-            `После включения нажмите кнопку ниже 👇`,
-            { parse_mode: 'Markdown', reply_markup: kb }
-          );
+          if (errMsg.includes('not a forum') || errMsg.includes('TOPICS_RESTRICTED')) {
+            instructions = 
+              `💡 **В этой группе выключены темы (форум).**\n\n` +
+              `👉 **Как исправить:**\n` +
+              `1. Зайдите в **«Настройки группы»** (Редактировать).\n` +
+              `2. Включите пункт **«Темы» (Topics)**.\n` +
+              `3. Убедитесь, что у бота включено право **«Управление темами»**.\n\n` +
+              `После включения нажмите кнопку ниже:`;
+          } else {
+            instructions = 
+              `💡 **Для автоматического создания топиков:**\n\n` +
+              `Убедитесь, что в группе включены темы и у бота есть право **«Управление темами»**.\n` +
+              `Затем нажмите кнопку:`;
+          }
+
+          const retryKb = new InlineKeyboard().text('🚀 Развернуть 9 топиков', `scaffold_here_${chat.id}`);
+          await ctx.reply(instructions, { parse_mode: 'Markdown', reply_markup: retryKb });
         }
       } else if (status === 'member') {
         const kb = new InlineKeyboard()
@@ -273,7 +347,7 @@ export class ProductionTelegramBot {
           `2️⃣ Назначьте меня **Администратором** с правами:\n` +
           `   • 🏷️ **Управление темами** (для создания 9 топиков)\n` +
           `   • 🗑️ **Удаление сообщений** (для автоочистки созвонов)\n\n` +
-          `Как только дадите права, я **автоматически создам все 9 топиков**!`,
+          `Как только дадите права, нажмите кнопку ниже:`,
           { parse_mode: 'Markdown', reply_markup: kb }
         );
       }
@@ -281,11 +355,74 @@ export class ProductionTelegramBot {
 
     // Callback when clicking manual scaffold button in group
     this.bot.callbackQuery(/^scaffold_here_(-?\d+)$/, async (ctx) => {
-      const targetChatId = Number(ctx.match[1]);
-      await ctx.answerCallbackQuery({ text: 'Создаю топики...' });
-      await ctx.reply('⏳ Разворачиваю 9 топиков конвейера...');
-      await this.scaffoldChatTopics(targetChatId, ctx.chat?.title || 'Проект');
-      await ctx.reply('✅ Готово! Все 9 топиков созданы и проект синхронизирован с Production Hub.');
+      const targetChatId = ctx.chat?.id || Number(ctx.match[1]);
+      await ctx.answerCallbackQuery({ text: 'Проверяю группу...' }).catch(() => {});
+
+      const chatTitle = ctx.chat?.title || 'Проект';
+      const fromUser = ctx.from;
+      const creatorName = `${fromUser.first_name || ''} ${fromUser.last_name || ''}`.trim() || fromUser.username || 'Администратор';
+      const creatorUsername = fromUser.username ? `@${fromUser.username}` : undefined;
+
+      const creatorMember: ProjectMember = {
+        id: `tg-${fromUser.id}`,
+        telegramUserId: fromUser.id,
+        name: creatorName,
+        username: creatorUsername,
+        roles: ['producer'],
+        isCreator: true
+      };
+
+      try {
+        await ctx.reply('⏳ Разворачиваю 9 топиков конвейера...');
+        const topics = await this.scaffoldChatTopics(targetChatId, chatTitle);
+
+        this.onProjectScaffolded?.(targetChatId, chatTitle, topics, [creatorMember], false);
+
+        const kb = this.getAppButton('📱 Определить роли команды');
+
+        await ctx.reply(
+          `🎉 **Production Hub подключен к проекту «${chatTitle}»!**\n\n` +
+          `✅ Создано 9 рабочих топиков конвейера.\n` +
+          `👤 **Создатель:** ${creatorName} (${creatorUsername || 'Продюсер / админ'})\n\n` +
+          `⚠️ **Следующий шаг:** перейдите в приложение, чтобы определить роли участников команды:\n` +
+          `• Эксперт\n` +
+          `• Продюсер / админ\n` +
+          `• Проектный менеджер\n` +
+          `• Рилсмейкер\n` +
+          `• Дизайнер\n` +
+          `• Оператор\n` +
+          `• СММ\n` +
+          `• Ассистент\n\n` +
+          `*Идентификация проекта завершится после назначения ролей 👇*`,
+          { parse_mode: 'Markdown', reply_markup: kb }
+        );
+      } catch (err: any) {
+        console.error('[TelegramBot] Ошибка создания топиков:', err);
+        const errMsg = err?.description || err?.message || String(err);
+        let instructions = '';
+
+        if (errMsg.includes('not a forum') || errMsg.includes('TOPICS_RESTRICTED')) {
+          instructions = 
+            `💡 **В этой группе выключены темы (форум).**\n\n` +
+            `👉 **Как исправить:**\n` +
+            `1. Зайдите в **«Настройки группы»** (Редактировать / значок карандаша).\n` +
+            `2. Найдите пункт **«Темы» (Topics)** и включите его.\n` +
+            `3. Убедитесь, что у бота есть право **«Управление темами»** в списке администраторов.\n\n` +
+            `После включения тем нажмите кнопку ниже:`;
+        } else if (errMsg.includes('not enough rights') || errMsg.includes('CHAT_ADMIN_REQUIRED')) {
+          instructions = 
+            `💡 **Боту не хватает прав администратора.**\n\n` +
+            `👉 **Как исправить:**\n` +
+            `1. Откройте профиль бота в группе.\n` +
+            `2. Сделайте его **Администратором** и включите галочку **«Управление темами»**.\n\n` +
+            `После этого нажмите кнопку повтора:`;
+        } else {
+          instructions = `⚠️ **Не удалось создать топики:** ${errMsg}\n\nУбедитесь, что темы в группе включены и у бота есть права администратора.`;
+        }
+
+        const retryKb = new InlineKeyboard().text('🚀 Попробовать снова', `scaffold_here_${targetChatId}`);
+        await ctx.reply(instructions, { parse_mode: 'Markdown', reply_markup: retryKb });
+      }
     });
 
     // When bot is added via traditional group invite
@@ -464,6 +601,7 @@ export class ProductionTelegramBot {
     const topicMap: ProjectTopics = {};
 
     if (this.bot) {
+      let lastError: any = null;
       for (const t of TOPIC_DEFINITIONS) {
         try {
           const result = await this.bot.api.createForumTopic(chatId, t.name, {
@@ -471,9 +609,14 @@ export class ProductionTelegramBot {
           });
           (topicMap as any)[t.key] = result.message_thread_id;
           console.log(`✅ [TelegramBot] Создан топик: ${t.name} (id: ${result.message_thread_id})`);
-        } catch (err) {
-          console.warn(`⚠️ [TelegramBot] Не удалось создать топик ${t.name}:`, err);
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`⚠️ [TelegramBot] Не удалось создать топик ${t.name}:`, err?.message || err);
         }
+      }
+
+      if (Object.keys(topicMap).length === 0 && lastError) {
+        throw lastError;
       }
 
       // Pin announcement in Topic 1 with Deep-Link
