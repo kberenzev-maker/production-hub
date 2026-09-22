@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "Production task or idea card",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string" },
+        "kind": { "type": "string" },
+        "nonContentCategory": { "type": "string" },
+        "nonContentStatus": { "type": "string" },
+        "goal": { "type": "string" },
+        "description": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "ownerAvatar": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "taskCategory": { "type": "string" },
+        "processType": { "type": "string" },
+        "expertId": { "type": "string" },
+        "expertName": { "type": "string" },
+        "scriptStatus": { "type": "string" },
+        "shootingStatus": { "type": "string" },
+        "editingStatus": { "type": "string" },
+        "placement": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title"]
+    },
+    "Call": {
+      "title": "Call",
+      "description": "Production call event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" }
+      },
+      "required": ["id", "title"]
+    },
+    "SystemState": {
+      "title": "SystemState",
+      "description": "System state flags like database reset",
+      "type": "object",
+      "properties": {
+        "isCleared": { "type": "boolean" },
+        "clearedAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tasks and idea cards in production"
+    },
+    "/calls/{callId}": {
+      "schema": "Call",
+      "description": "Scheduled call meetings"
+    },
+    "/system/{stateId}": {
+      "schema": "SystemState",
+      "description": "Global system state and persistence flags"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    match /tasks/{taskId} {
+      allow read: if true;
+      allow create, update: if isValidId(taskId) && request.resource.data.title is string;
+      allow delete: if isValidId(taskId);
+    }
+
+    match /calls/{callId} {
+      allow read: if true;
+      allow create, update: if isValidId(callId);
+      allow delete: if isValidId(callId);
+    }
+
+    match /system/{stateId} {
+      allow read, write: if isValidId(stateId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

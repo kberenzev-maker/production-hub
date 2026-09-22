@@ -1,0 +1,6 @@
+{
+  "name": "Production Hub",
+  "description": "Telegram Mini App и координационный центр производства контента экспертов (Reels, Карусели, Stories)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

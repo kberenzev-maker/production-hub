@@ -1,0 +1,42 @@
+services:
+  # ============================================================================
+  # 1. PRODUCTION СЕРВИС (ветка main)
+  # ============================================================================
+  - type: web
+    name: prodhub-production
+    env: docker
+    plan: free
+    branch: main
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # ============================================================================
+  # 2. STAGING / TEST СЕРВИС (ветка stage)
+  # ============================================================================
+  - type: web
+    name: prodhub-staging
+    env: docker
+    plan: free
+    branch: stage
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: 3000
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
