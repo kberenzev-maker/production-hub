@@ -106,6 +106,10 @@ function saveDatabase(db: SyncDatabase) {
 }
 
 const app = express();
+app.use((req, res, next) => {
+  res.setHeader('ngrok-skip-browser-warning', 'true');
+  next();
+});
 app.use(express.json());
 
 const server = http.createServer(app);

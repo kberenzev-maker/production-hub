@@ -204,8 +204,9 @@ export function realtimeSyncPlugin(): Plugin {
         }
       }, 30000);
 
-      // REST fallback endpoints
+      // REST fallback endpoints & ngrok warning bypass
       server.middlewares.use((req, res, next) => {
+        res.setHeader('ngrok-skip-browser-warning', 'true');
         if (req.url === '/api/sync/state' && req.method === 'GET') {
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify(loadDatabase()));
