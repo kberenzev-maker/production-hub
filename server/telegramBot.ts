@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard } from 'grammy';
-import { Project, ProjectTopics, TaskCard, CallEvent } from '../src/types.ts';
+import { Project, ProjectTopics, TaskCard, CallEvent, ProjectMember, TEAM_ROLES } from '../src/types.ts';
 
 export interface BotConfig {
   token: string;
@@ -40,12 +40,12 @@ export class ProductionTelegramBot {
   // Callbacks to interact with shared database
   private onTaskCreated?: (task: TaskCard) => void;
   private onCallUpdated?: (call: CallEvent) => void;
-  private onProjectScaffolded?: (chatId: number, chatTitle: string, topics: ProjectTopics) => void;
+  private onProjectScaffolded?: (chatId: number, chatTitle: string, topics: ProjectTopics, members?: ProjectMember[], isSetupComplete?: boolean) => void;
 
   constructor(config: BotConfig, callbacks?: {
     onTaskCreated?: (task: TaskCard) => void;
     onCallUpdated?: (call: CallEvent) => void;
-    onProjectScaffolded?: (chatId: number, chatTitle: string, topics: ProjectTopics) => void;
+    onProjectScaffolded?: (chatId: number, chatTitle: string, topics: ProjectTopics, members?: ProjectMember[], isSetupComplete?: boolean) => void;
   }) {
     this.token = config.token;
     this.appUrl = config.appUrl || 'http://localhost:3000';
@@ -205,23 +205,40 @@ export class ProductionTelegramBot {
             { parse_mode: 'Markdown' }
           );
 
+          const addedByUser = update.from;
+          const creatorName = `${addedByUser.first_name || ''} ${addedByUser.last_name || ''}`.trim() || addedByUser.username || 'Администратор';
+          const creatorUsername = addedByUser.username ? `@${addedByUser.username}` : undefined;
+
+          const creatorMember: ProjectMember = {
+            id: `tg-${addedByUser.id}`,
+            telegramUserId: addedByUser.id,
+            name: creatorName,
+            username: creatorUsername,
+            roles: ['producer'],
+            isCreator: true
+          };
+
           const topics = await this.scaffoldChatTopics(chat.id, chatTitle);
 
-          const kb = this.getAppButton('📱 Открыть Production Hub');
+          // Notify server database (isSetupComplete: false)
+          this.onProjectScaffolded?.(chat.id, chatTitle, topics, [creatorMember], false);
+
+          const kb = this.getAppButton('📱 Определить роли команды');
 
           await ctx.reply(
-            `🚀 **Конвейер полностью настроен!**\n\n` +
-            `Создано 9 специализированных топиков:\n` +
-            `1. ⚡ Идеи и подборки (запись войсов в ЛС)\n` +
-            `2. 📝 Сценарии\n` +
-            `3. 🎬 Съёмка\n` +
-            `4. 📁 Материалы (дубли и исходники)\n` +
-            `5. 📱 Рилсы\n` +
-            `6. 🎠 Карусели\n` +
-            `7. 👀 Сторис\n` +
-            `8. 📣 Публикации\n` +
-            `9. 🎙️ Созвоны (чистый топик и напоминания)\n\n` +
-            `Проект автоматически добавлен в веб-приложение.`,
+            `🎉 **Production Hub подключен к проекту «${chatTitle}»!**\n\n` +
+            `✅ Создано 9 рабочих топиков конвейера.\n` +
+            `👤 **Создатель:** ${creatorName} (${creatorUsername || 'Продюсер / админ'})\n\n` +
+            `⚠️ **Следующий шаг:** перейдите в приложение, чтобы определить роли участников команды:\n` +
+            `• Эксперт\n` +
+            `• Продюсер / админ\n` +
+            `• Проектный менеджер\n` +
+            `• Рилсмейкер\n` +
+            `• Дизайнер\n` +
+            `• Оператор\n` +
+            `• СММ\n` +
+            `• Ассистент\n\n` +
+            `*Идентификация проекта завершится после назначения ролей 👇*`,
             { parse_mode: 'Markdown', reply_markup: kb }
           );
         } else {
@@ -531,6 +548,34 @@ export class ProductionTelegramBot {
       } catch (e) {
         console.warn('[TelegramBot] Не удалось отправить напоминание в чат созвона:', e);
       }
+    }
+  }
+
+  public async notifyProjectSetupComplete(chatId: number, chatTitle: string, members: ProjectMember[]) {
+    if (!this.bot) return;
+    try {
+      const rolesSummary = members.map(m => {
+        const roleLabels = m.roles.map(r => {
+          const found = TEAM_ROLES.find(tr => tr.id === r);
+          return found ? found.label : r;
+        }).join(', ');
+        return `• **${m.name}** (${m.username || 'ТГ'}): ${roleLabels}`;
+      }).join('\n');
+
+      const kb = this.getAppButton('📱 Открыть Production Hub');
+
+      await this.bot.api.sendMessage(
+        chatId,
+        `🚀 **Идентификация проекта «${chatTitle}» успешно завершена!**\n\n` +
+        `👥 **Распределение ролей команды:**\n${rolesSummary || '• Роли определены'}\n\n` +
+        `Конвейер контента активен. Нажмите кнопку ниже, чтобы начать работу 👇`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: kb
+        }
+      );
+    } catch (err: any) {
+      console.warn('[TelegramBot] Ошибка отправки уведомления об идентификации проекта:', err.message);
     }
   }
 

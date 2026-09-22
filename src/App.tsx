@@ -12,6 +12,7 @@ import { TaskDetailModal } from './components/TaskDetailModal';
 import { ScriptEditorModal } from './components/ScriptEditorModal';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { EmptyProjectsOnboarding } from './components/EmptyProjectsOnboarding';
+import { ProjectSetupModal } from './components/ProjectSetupModal';
 
 const AppContent: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('plan');
@@ -22,6 +23,8 @@ const AppContent: React.FC = () => {
     calls,
     currentExpertId, 
     projects,
+    currentProject,
+    completeProjectSetup
   } = useProduction();
 
   // Normalize active tab for bottom bar
@@ -57,6 +60,11 @@ const AppContent: React.FC = () => {
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-4 space-y-5 pb-24">
         {projects.length === 0 ? (
           <EmptyProjectsOnboarding />
+        ) : currentProject && !currentProject.isSetupComplete ? (
+          <ProjectSetupModal 
+            project={currentProject}
+            onComplete={(members) => completeProjectSetup(currentProject.id, members)}
+          />
         ) : (
           <>
             {/* SCREEN 1: План & Календарь */}
@@ -93,7 +101,7 @@ const AppContent: React.FC = () => {
       </main>
 
       {/* Fixed Bottom TabBar */}
-      {projects.length > 0 && (
+      {projects.length > 0 && currentProject?.isSetupComplete && (
         <BottomTabBar
           activeTab={activeMainTab}
           onTabChange={(tab) => setCurrentTab(tab)}

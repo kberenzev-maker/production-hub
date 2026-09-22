@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { TaskCard, CallEvent, UserRole, ProductionPulseStats, MaterialPool, PlacementType, ChatUser, ProductionNorms, WeeklyPlannerSchedule, TaskKind, ContentType, SubTask, Project } from '../types';
+import { TaskCard, CallEvent, UserRole, TeamRole, ProjectMember, TEAM_ROLES, ProductionPulseStats, MaterialPool, PlacementType, ChatUser, ProductionNorms, WeeklyPlannerSchedule, TaskKind, ContentType, SubTask, Project } from '../types';
 import { INITIAL_TASKS, INITIAL_CALLS, INITIAL_EXPERTS } from '../data/initialData';
 import { formatDateToISO, formatRussianDate } from '../utils/dateUtils';
 import { generateWorkingCallLink } from '../utils/callLinkGenerator';
@@ -21,6 +21,14 @@ interface ProductionContextType {
   projects: Project[];
   currentProjectId: string;
   setCurrentProjectId: (id: string) => void;
+  currentProject: Project | null;
+  completeProjectSetup: (projectId: string, members: ProjectMember[]) => void;
+  currentUser: {
+    id?: number;
+    name: string;
+    username?: string;
+    roles: TeamRole[];
+  };
   scaffoldProjectTopics: (chatId: number, chatTitle: string) => void;
 
   currentRole: UserRole;
@@ -172,6 +180,50 @@ const INITIAL_CHAT_USERS: ChatUser[] = [
 export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string>('');
+
+  const currentProject = useMemo(() => {
+    return projects.find(p => p.id === currentProjectId) || projects[0] || null;
+  }, [projects, currentProjectId]);
+
+  const completeProjectSetup = (projectId: string, members: ProjectMember[]) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        const updated: Project = {
+          ...p,
+          members,
+          isSetupComplete: true,
+          updatedAt: new Date().toISOString()
+        };
+        syncService.sendProjectUpsert(updated);
+        return updated;
+      }
+      return p;
+    }));
+  };
+
+  const currentUser = useMemo(() => {
+    const tgUser = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp?.initDataUnsafe?.user : null;
+    const matchedMember = currentProject?.members?.find(m => 
+      (tgUser?.id && m.telegramUserId === tgUser.id) ||
+      (tgUser?.username && m.username?.toLowerCase() === `@${tgUser.username.toLowerCase()}`) ||
+      (tgUser?.username && m.username?.toLowerCase() === tgUser.username.toLowerCase())
+    );
+
+    const name = tgUser
+      ? `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() || tgUser.username || 'Пользователь'
+      : (matchedMember?.name || 'Продюсер');
+    const username = tgUser?.username ? `@${tgUser.username}` : (matchedMember?.username || '@producer');
+    const roles: TeamRole[] = matchedMember?.roles && matchedMember.roles.length > 0 
+      ? matchedMember.roles 
+      : (currentProject?.members?.[0]?.roles || ['producer']);
+
+    return {
+      id: tgUser?.id,
+      name,
+      username,
+      roles
+    };
+  }, [currentProject]);
 
   const scaffoldProjectTopics = (chatId: number, chatTitle: string) => {
     syncService.sendScaffoldProject(chatId, chatTitle);
@@ -1593,6 +1645,9 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         projects,
         currentProjectId,
         setCurrentProjectId,
+        currentProject,
+        completeProjectSetup,
+        currentUser,
         scaffoldProjectTopics,
         botLogs,
         addBotLog,

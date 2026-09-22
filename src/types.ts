@@ -36,12 +36,47 @@ export interface WeeklyPlannerSchedule {
   stories: WeekDayShort[];
 }
 
-export type UserRole = 
-  | 'super_admin'      // Кирилл / Продюсер
-  | 'expert'           // Вера
-  | 'editor'           // Монтажер
-  | 'designer'         // Дизайнер
-  | 'publisher';       // Ассистент-публикатор
+export type TeamRole = 
+  | 'expert'        // Эксперт
+  | 'producer'      // Продюсер / админ (тот кто добавил)
+  | 'designer'      // Дизайнер
+  | 'reelsmaker'    // Рилсмейкер
+  | 'assistant'     // Ассистент
+  | 'pm'            // Проектный менеджер
+  | 'cameraman'     // Оператор
+  | 'smm';          // СММ
+
+export interface RoleDefinition {
+  id: TeamRole;
+  label: string;
+  shortLabel: string;
+  badgeColor: string;
+  bgLightColor: string;
+  description: string;
+}
+
+export const TEAM_ROLES: RoleDefinition[] = [
+  { id: 'expert', label: 'Эксперт', shortLabel: 'Эксперт', badgeColor: '#FF9500', bgLightColor: 'rgba(255, 149, 0, 0.12)', description: 'Запись идей, утверждение сценариев, съемка' },
+  { id: 'producer', label: 'Продюсер / админ', shortLabel: 'Продюсер', badgeColor: '#007AFF', bgLightColor: 'rgba(0, 122, 255, 0.12)', description: 'Управление проектом, стратегия, созвоны' },
+  { id: 'pm', label: 'Проектный менеджер', shortLabel: 'PM', badgeColor: '#5856D6', bgLightColor: 'rgba(88, 86, 214, 0.12)', description: 'Координация пайплайна, дедлайны, контроль задач' },
+  { id: 'reelsmaker', label: 'Рилсмейкер', shortLabel: 'Рилсмейкер', badgeColor: '#34C759', bgLightColor: 'rgba(52, 199, 89, 0.12)', description: 'Монтаж вертикальных видео, динамика, звук' },
+  { id: 'designer', label: 'Дизайнер', shortLabel: 'Дизайнер', badgeColor: '#AF52DE', bgLightColor: 'rgba(175, 82, 222, 0.12)', description: 'Обложки, карусели, визуал, сторис-шаблоны' },
+  { id: 'cameraman', label: 'Оператор', shortLabel: 'Оператор', badgeColor: '#FF2D55', bgLightColor: 'rgba(255, 45, 85, 0.12)', description: 'Съемка материала, свет, дубли и исходники' },
+  { id: 'smm', label: 'СММ', shortLabel: 'СММ', badgeColor: '#32ADE6', bgLightColor: 'rgba(50, 173, 230, 0.12)', description: 'Публикация контента, копирайтинг, аналитика' },
+  { id: 'assistant', label: 'Ассистент', shortLabel: 'Ассистент', badgeColor: '#8E8E93', bgLightColor: 'rgba(142, 142, 147, 0.12)', description: 'Организационные задачи, сбор материалов, помощь' }
+];
+
+export interface ProjectMember {
+  id: string;
+  telegramUserId?: number;
+  name: string;
+  username?: string;
+  roles: TeamRole[]; // Multiple roles per person, rights sum up
+  avatar?: string;
+  isCreator?: boolean;
+}
+
+export type UserRole = TeamRole | 'super_admin';
 
 export type TagColor = 
   | 'reels'           // Фиолетовый
@@ -110,6 +145,8 @@ export interface Project {
   title: string;
   username?: string;
   topics?: ProjectTopics;
+  members?: ProjectMember[];
+  isSetupComplete?: boolean; // True when roles identification is completed
   createdAt: string;
   updatedAt: string;
 }

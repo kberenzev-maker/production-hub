@@ -131,12 +131,14 @@ export function realtimeSyncPlugin(): Plugin {
           saveDatabase(activeDb);
           broadcast({ type: 'CALL_UPSERTED', call });
         },
-        onProjectScaffolded: (chatId, chatTitle, topics) => {
+        onProjectScaffolded: (chatId, chatTitle, topics, members, isSetupComplete) => {
           const activeDb = loadDatabase();
           let proj = activeDb.projects.find((p: any) => p.chatId === chatId);
           if (proj) {
             proj.topics = topics;
             proj.title = chatTitle;
+            if (members) proj.members = members;
+            if (isSetupComplete !== undefined) proj.isSetupComplete = isSetupComplete;
             proj.updatedAt = new Date().toISOString();
           } else {
             proj = {
@@ -144,6 +146,8 @@ export function realtimeSyncPlugin(): Plugin {
               chatId,
               title: chatTitle,
               topics,
+              members: members || [],
+              isSetupComplete: isSetupComplete ?? false,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             };
@@ -308,6 +312,7 @@ export function realtimeSyncPlugin(): Plugin {
                 const incomingProj = msg.project;
                 if (!incomingProj || !incomingProj.id) return;
                 const idx = activeDb.projects.findIndex(p => p.id === incomingProj.id);
+                const wasComplete = idx >= 0 ? activeDb.projects[idx].isSetupComplete : false;
                 if (idx >= 0) {
                   activeDb.projects[idx] = incomingProj;
                 } else {
@@ -319,6 +324,14 @@ export function realtimeSyncPlugin(): Plugin {
                   project: incomingProj,
                   clientId: msg.clientId
                 }, ws);
+
+                if (!wasComplete && incomingProj.isSetupComplete && incomingProj.chatId) {
+                  bot.notifyProjectSetupComplete(
+                    Number(incomingProj.chatId),
+                    incomingProj.title,
+                    incomingProj.members || []
+                  );
+                }
                 break;
               }
 

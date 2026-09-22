@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useProduction } from '../context/ProductionContext';
-import { UserRole } from '../types';
-import { ChevronDown, Settings, X, Eye, Plus } from 'lucide-react';
-import { TeamManagementModal } from './TeamManagementModal';
+import { TEAM_ROLES } from '../types';
+import { ChevronDown, Settings, X, Eye } from 'lucide-react';
 import { SettingsModal } from './SettingsModal';
 
 interface HeaderProps {
@@ -11,15 +10,10 @@ interface HeaderProps {
   onOpenCreateTask?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onOpenCreateTask }) => {
+export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => {
   const { 
     impersonatedRole,
     setImpersonatedRole,
-    activeRole,
-    currentExpertId, 
-    setCurrentExpertId, 
-    experts,
-    projectName,
     isSettingsOpen,
     setIsSettingsOpen,
     settingsTab,
@@ -27,13 +21,10 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onOpe
     projects,
     currentProjectId,
     setCurrentProjectId,
-    scaffoldProjectTopics
+    currentUser
   } = useProduction();
 
-  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-
-  const isProducer = activeRole === 'super_admin';
 
   return (
     <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-[#C6C6C8]/40">
@@ -56,8 +47,8 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onOpe
       )}
 
       {/* Main Bar: height 48px */}
-      <div className="h-12 max-w-7xl mx-auto px-4 flex items-center justify-between gap-3">
-        {/* Left: Project Selector (Telegram Chat) */}
+      <div className="h-12 max-w-7xl mx-auto px-4 flex items-center justify-between gap-2">
+        {/* Left: Current Project Selector */}
         <div className="flex items-center gap-2 min-w-0">
           {projects.length > 0 ? (
             <div className="relative inline-flex items-center min-w-0">
@@ -65,8 +56,8 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onOpe
                 id="header-project-select"
                 value={currentProjectId}
                 onChange={(e) => setCurrentProjectId(e.target.value)}
-                className="appearance-none bg-[#767680]/12 hover:bg-[#767680]/18 text-black text-[13px] sm:text-[14px] font-semibold py-1.5 pl-3 pr-7 rounded-full cursor-pointer focus:outline-none transition-colors truncate max-w-[200px] sm:max-w-[280px]"
-                title="Выбрать проект (чат)"
+                className="appearance-none bg-[#767680]/12 hover:bg-[#767680]/18 text-black text-[13px] sm:text-[14px] font-semibold py-1.5 pl-3 pr-7 rounded-full cursor-pointer focus:outline-none transition-colors truncate max-w-[150px] sm:max-w-[260px]"
+                title="Текущий проект"
               >
                 {projects.map(proj => (
                   <option key={proj.id} value={proj.id}>
@@ -74,55 +65,69 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onOpe
                   </option>
                 ))}
               </select>
-              <ChevronDown className="w-3.5 h-3.5 text-[#8E8E93] absolute right-2.5 pointer-events-none" />
+              <ChevronDown className="w-3.5 h-3.5 text-[#8E8E93] absolute right-2 pointer-events-none" />
             </div>
           ) : (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#767680]/10 rounded-full text-[13px] font-medium text-[#8E8E93]">
-              <span>Нет проектов</span>
+            <div className="inline-flex items-center gap-1.5 text-[14px] font-bold text-black">
+              <span>💬 Production Hub</span>
             </div>
           )}
         </div>
 
-        {/* Right: Actions */}
+        {/* Right: User Profile Pill (TG Name & Roles) + Settings Gear */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Realtime Sync Badge */}
+          {/* User Profile Pill */}
           <div 
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium select-none"
-            style={{
-              backgroundColor: syncStatus?.status === 'connected' ? 'rgba(52, 199, 89, 0.12)' : syncStatus?.status === 'connecting' ? 'rgba(255, 149, 0, 0.12)' : 'rgba(142, 142, 147, 0.12)',
-              color: syncStatus?.status === 'connected' ? '#248A3D' : syncStatus?.status === 'connecting' ? '#C97500' : '#8E8E93'
-            }}
-            title={syncStatus?.status === 'connected' ? `База данных синхронизирована в реальном времени. В сети: ${syncStatus.clientCount}` : 'Синхронизация с базой...'}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#767680]/10 text-xs font-medium max-w-[180px] sm:max-w-[260px]"
+            title={`Пользователь: ${currentUser.name} (${currentUser.username || 'Telegram'})\nРоли: ${currentUser.roles.join(', ')}`}
           >
-            <span className={`w-2 h-2 rounded-full ${syncStatus?.status === 'connected' ? 'bg-[#34C759] animate-pulse' : syncStatus?.status === 'connecting' ? 'bg-[#FF9500] animate-pulse' : 'bg-[#8E8E93]'}`} />
-            <span className="hidden xs:inline">
-              {syncStatus?.status === 'connected' 
-                ? (syncStatus.clientCount > 1 ? `${syncStatus.clientCount} в сети` : 'База онлайн')
-                : syncStatus?.status === 'connecting' ? 'Синхронизация...' : 'Офлайн'}
+            {/* Sync Pulse Dot */}
+            <span 
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                syncStatus?.status === 'connected' ? 'bg-[#34C759] animate-pulse' : 'bg-[#FF9500]'
+              }`} 
+              title={syncStatus?.status === 'connected' ? 'База данных онлайн' : 'Синхронизация...'}
+            />
+            
+            {/* User name */}
+            <span className="font-semibold text-black truncate text-[11px] sm:text-[13px]">
+              {currentUser.name}
             </span>
+
+            {/* Role Badges */}
+            <div className="flex items-center gap-1 shrink-0 overflow-hidden">
+              {currentUser.roles.slice(0, 2).map(r => {
+                const roleDef = TEAM_ROLES.find(tr => tr.id === r);
+                return (
+                  <span
+                    key={r}
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none"
+                    style={{
+                      backgroundColor: roleDef?.bgLightColor || 'rgba(0,122,255,0.1)',
+                      color: roleDef?.badgeColor || '#007AFF'
+                    }}
+                  >
+                    {roleDef?.shortLabel || r}
+                  </span>
+                );
+              })}
+              {currentUser.roles.length > 2 && (
+                <span className="text-[10px] text-[#8E8E93] font-bold">
+                  +{currentUser.roles.length - 2}
+                </span>
+              )}
+            </div>
           </div>
 
-          {onOpenCreateTask && projects.length > 0 && (
-            <button
-              type="button"
-              onClick={onOpenCreateTask}
-              className="w-8 h-8 rounded-full bg-[#007AFF] text-white flex items-center justify-center hover:bg-[#007AFF]/90 transition-colors cursor-pointer"
-              title="Создать задачу"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          )}
-
-          {isProducer && (
-            <button
-              type="button"
-              onClick={() => setIsSettingsModalOpen(true)}
-              className="w-8 h-8 rounded-full bg-[#767680]/12 text-[#007AFF] hover:bg-[#767680]/18 flex items-center justify-center transition-colors cursor-pointer"
-              title="Настройки"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-          )}
+          {/* Settings Button */}
+          <button
+            type="button"
+            onClick={() => setIsSettingsModalOpen(true)}
+            className="w-8 h-8 rounded-full bg-[#767680]/12 text-[#8E8E93] hover:text-[#007AFF] hover:bg-[#767680]/18 flex items-center justify-center transition-colors cursor-pointer"
+            title="Настройки"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
