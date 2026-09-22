@@ -131,6 +131,11 @@ export function realtimeSyncPlugin(): Plugin {
           saveDatabase(activeDb);
           broadcast({ type: 'CALL_UPSERTED', call });
         },
+        hasExistingTopics: (chatId: number) => {
+          const activeDb = loadDatabase();
+          const proj = activeDb.projects.find((p: any) => p.chatId === chatId);
+          return !!(proj && proj.topics && Object.keys(proj.topics).length >= 5);
+        },
         onProjectScaffolded: (chatId, chatTitle, topics, members, isSetupComplete) => {
           const activeDb = loadDatabase();
           let proj = activeDb.projects.find((p: any) => p.chatId === chatId);

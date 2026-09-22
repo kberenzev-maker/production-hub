@@ -1,5 +1,42 @@
 {
-  "tasks": [],
+  "tasks": [
+    {
+      "id": "506",
+      "title": "я думаю о том что это хорошее начало приложения",
+      "type": "reels",
+      "kind": "content",
+      "expertId": "vera",
+      "expertName": "Кирилл Березнев",
+      "projectId": "-1004292800394",
+      "scriptStatus": "gray",
+      "shootingStatus": "gray",
+      "editingStatus": "gray",
+      "materialsTotalCount": 0,
+      "pools": [],
+      "ideaDescription": "я думаю о том что это хорошее начало приложения\n\nhttps://f52d7de4504b24.lhr.life",
+      "references": [
+        {
+          "id": "ref-0",
+          "url": "https://f52d7de4504b24.lhr.life",
+          "platform": "other",
+          "title": "Референс #1"
+        }
+      ],
+      "voiceNotes": [
+        {
+          "id": "voice-1790112152219",
+          "url": "https://api.telegram.org/file/bot8782045236:AAG5NQkGiaXsDhhHKJMm-TR-KLw6Wo6ZKqs/voice/file_0.oga",
+          "duration": 3,
+          "senderName": "Кирилл Березнев",
+          "textTranscript": "",
+          "createdAt": "2026-09-22T21:22:42.892Z"
+        }
+      ],
+      "placement": "unassigned",
+      "createdAt": "2026-09-22T21:22:42.892Z",
+      "updatedAt": "2026-09-22T21:22:42.892Z"
+    }
+  ],
   "calls": [],
   "projects": [
     {
@@ -36,5 +73,5 @@
     }
   ],
   "version": 1,
-  "updatedAt": "2026-09-22T21:19:21.812Z"
+  "updatedAt": "2026-09-22T21:22:42.893Z"
 }

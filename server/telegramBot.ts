@@ -37,15 +37,16 @@ export class ProductionTelegramBot {
   private ideaSessions = new Map<number, IdeaSession>(); // userId -> session
   private isRunning: boolean = false;
   
-  // Callbacks to interact with shared database
   private onTaskCreated?: (task: TaskCard) => void;
   private onCallUpdated?: (call: CallEvent) => void;
   private onProjectScaffolded?: (chatId: number, chatTitle: string, topics: ProjectTopics, members?: ProjectMember[], isSetupComplete?: boolean) => void;
+  private hasExistingTopics?: (chatId: number) => boolean;
 
   constructor(config: BotConfig, callbacks?: {
     onTaskCreated?: (task: TaskCard) => void;
     onCallUpdated?: (call: CallEvent) => void;
     onProjectScaffolded?: (chatId: number, chatTitle: string, topics: ProjectTopics, members?: ProjectMember[], isSetupComplete?: boolean) => void;
+    hasExistingTopics?: (chatId: number) => boolean;
   }) {
     this.token = config.token;
     this.appUrl = config.appUrl || 'http://localhost:3000';
@@ -53,6 +54,7 @@ export class ProductionTelegramBot {
     this.onTaskCreated = callbacks?.onTaskCreated;
     this.onCallUpdated = callbacks?.onCallUpdated;
     this.onProjectScaffolded = callbacks?.onProjectScaffolded;
+    this.hasExistingTopics = callbacks?.hasExistingTopics;
 
     // Stop any previous bot instance across Vite HMR reloads
     const prevInstance = (globalThis as any).__telegramBotInstance;
@@ -189,6 +191,12 @@ export class ProductionTelegramBot {
       }
 
       const chatTitle = ctx.chat.title || 'Проект';
+
+      if (this.hasExistingTopics?.(ctx.chat.id)) {
+        const kb = this.getAppButton('📱 Открыть Production Hub');
+        await ctx.reply(`✅ В проекте «${chatTitle}» все топики уже созданы и активны.`, { reply_markup: kb });
+        return;
+      }
       const fromUser = ctx.from;
       const creatorName = `${fromUser?.first_name || ''} ${fromUser?.last_name || ''}`.trim() || fromUser?.username || 'Администратор';
       const creatorUsername = fromUser?.username ? `@${fromUser.username}` : undefined;
@@ -267,6 +275,12 @@ export class ProductionTelegramBot {
 
       if (status === 'administrator') {
         const chatTitle = chat.title || 'Новый проект';
+
+        // Idempotency: don't recreate topics if already scaffolded
+        if (this.hasExistingTopics?.(chat.id)) {
+          console.log(`ℹ️ [TelegramBot] Проект «${chatTitle}» (${chat.id}) уже имеет созданные топики. Пропускаем.`);
+          return;
+        }
         const addedByUser = update.from;
         const creatorName = `${addedByUser.first_name || ''} ${addedByUser.last_name || ''}`.trim() || addedByUser.username || 'Администратор';
         const creatorUsername = addedByUser.username ? `@${addedByUser.username}` : undefined;
@@ -356,9 +370,13 @@ export class ProductionTelegramBot {
     // Callback when clicking manual scaffold button in group
     this.bot.callbackQuery(/^scaffold_here_(-?\d+)$/, async (ctx) => {
       const targetChatId = ctx.chat?.id || Number(ctx.match[1]);
-      await ctx.answerCallbackQuery({ text: 'Проверяю группу...' }).catch(() => {});
-
       const chatTitle = ctx.chat?.title || 'Проект';
+
+      if (this.hasExistingTopics?.(targetChatId)) {
+        const kb = this.getAppButton('📱 Открыть Production Hub');
+        await ctx.reply(`✅ В проекте «${chatTitle}» все топики уже созданы и активны.`, { reply_markup: kb });
+        return;
+      }
       const fromUser = ctx.from;
       const creatorName = `${fromUser.first_name || ''} ${fromUser.last_name || ''}`.trim() || fromUser.username || 'Администратор';
       const creatorUsername = fromUser.username ? `@${fromUser.username}` : undefined;
