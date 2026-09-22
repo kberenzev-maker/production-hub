@@ -95,7 +95,23 @@ const broadcastPresence = () => {
 };
 
 const token = process.env.TELEGRAM_BOT_TOKEN || '';
-const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+let appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+
+// Auto-detect active ngrok tunnel if available
+try {
+  const ngrokRes = await fetch('http://127.0.0.1:4040/api/tunnels');
+  if (ngrokRes.ok) {
+    const ngrokData: any = await ngrokRes.json();
+    const httpsTunnel = ngrokData?.tunnels?.find((t: any) => t.proto === 'https');
+    if (httpsTunnel?.public_url) {
+      appUrl = httpsTunnel.public_url;
+      console.log(`🌐 [StandaloneServer] Обнаружен активный ngrok туннель: ${appUrl}`);
+    }
+  }
+} catch {
+  // ngrok not available, using appUrl as configured
+}
+
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
 
 const bot = new ProductionTelegramBot({
