@@ -88,12 +88,19 @@ export class ProductionTelegramBot {
     }
   }
 
-  private getAppButton(text: string = '📱 Открыть Production Hub'): InlineKeyboard {
+  private getAppButton(text: string = '📱 Открыть Production Hub', isPrivate: boolean = false): InlineKeyboard {
     const kb = new InlineKeyboard();
-    if (this.appUrl && this.appUrl.startsWith('https://')) {
+    // Telegram Bot API restricts inline web_app buttons to 1-on-1 private chats only!
+    // In groups and forum topics, inline buttons MUST use url().
+    if (isPrivate && this.appUrl && this.appUrl.startsWith('https://')) {
       return kb.webApp(text, this.appUrl);
     }
-    return kb.url(text, this.appUrl || 'http://localhost:3000');
+    kb.url(text, this.appUrl || 'http://localhost:3000');
+    // In group chats, add a second button allowing users to launch via the bot's private chat Menu Button:
+    if (!isPrivate) {
+      kb.row().url('🤖 Открыть через бота', 'https://t.me/content_production_hub_bot');
+    }
+    return kb;
   }
 
   private setupHandlers() {
@@ -149,7 +156,7 @@ export class ProductionTelegramBot {
         `Я координационный бот **Production Hub**.\n\n` +
         `📱 Чтобы открыть веб-приложение, нажми кнопку ниже или кнопку **Меню** в левом нижнем углу:`,
         {
-          reply_markup: this.getAppButton('📱 Открыть Production Hub')
+          reply_markup: this.getAppButton('📱 Открыть Production Hub', true)
         }
       );
     });
@@ -163,7 +170,7 @@ export class ProductionTelegramBot {
         `• 🎙️ Чтобы надиктовать идею, перейдите по ссылке из топика «1. Идеи и подборки»`,
         {
           parse_mode: 'Markdown',
-          reply_markup: this.getAppButton('📱 Открыть Production Hub')
+          reply_markup: this.getAppButton('📱 Открыть Production Hub', ctx.chat.type === 'private')
         }
       );
     });
