@@ -150,6 +150,7 @@ interface ProductionContextType {
   // Bot logs / Notifications for Topic Simulator
   botLogs: { id: string; time: string; topic: string; text: string; actionType?: string }[];
   addBotLog: (topic: string, text: string, actionType?: string) => void;
+  refreshData: () => Promise<void>;
 }
 
 const ProductionContext = createContext<ProductionContextType | null>(null);
@@ -587,6 +588,20 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     });
   }, []);
+
+  const refreshData = async () => {
+    try {
+      const res = await fetch('/api/sync/state');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.projects && Array.isArray(data.projects)) setProjects(data.projects);
+        if (data.tasks && Array.isArray(data.tasks)) setTasks(data.tasks);
+        if (data.calls && Array.isArray(data.calls)) setCalls(data.calls);
+      }
+    } catch (e) {
+      console.warn('Failed to refresh data:', e);
+    }
+  };
 
   // Real-time synchronization with Firestore
   useEffect(() => {
@@ -1759,6 +1774,7 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         scaffoldProjectTopics,
         botLogs,
         addBotLog,
+        refreshData,
       }}
     >
       {children}
