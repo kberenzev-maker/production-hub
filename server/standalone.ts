@@ -189,6 +189,71 @@ app.get('/api/sync/state', (req, res) => {
   res.json(loadDatabase());
 });
 
+const avatarCache = new Map<string, { buffer: Buffer; contentType: string; expires: number }>();
+
+app.get('/api/telegram/avatar/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    if (!userId || !token) {
+      return res.status(404).end();
+    }
+
+    const cached = avatarCache.get(userId);
+    if (cached && cached.expires > Date.now()) {
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(cached.buffer);
+    }
+
+    const photoRes = await fetch(`https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${userId}&limit=1`);
+    if (!photoRes.ok) {
+      return res.status(404).end();
+    }
+    const photoData: any = await photoRes.json();
+    if (!photoData.ok || !photoData.result?.photos?.length) {
+      return res.status(404).end();
+    }
+
+    const sizes = photoData.result.photos[0];
+    const photo = sizes.find((s: any) => s.width >= 160 && s.width <= 320) || sizes[sizes.length - 1];
+    if (!photo?.file_id) {
+      return res.status(404).end();
+    }
+
+    const fileRes = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${photo.file_id}`);
+    if (!fileRes.ok) {
+      return res.status(404).end();
+    }
+    const fileData: any = await fileRes.json();
+    if (!fileData.ok || !fileData.result?.file_path) {
+      return res.status(404).end();
+    }
+
+    const imgRes = await fetch(`https://api.telegram.org/file/bot${token}/${fileData.result.file_path}`);
+    if (!imgRes.ok) {
+      return res.status(404).end();
+    }
+
+    const arrayBuf = await imgRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuf);
+    const rawType = imgRes.headers.get('content-type');
+    const contentType = (rawType && !rawType.includes('octet-stream')) ? rawType : 'image/jpeg';
+
+    avatarCache.set(userId, {
+      buffer,
+      contentType,
+      expires: Date.now() + 1000 * 60 * 60, // 1 hour cache
+    });
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  } catch (err) {
+    console.warn('[StandaloneServer] Error serving avatar for user', req.params.userId, err);
+    return res.status(404).end();
+  }
+});
+
 app.post('/api/bot/scaffold', async (req, res) => {
   try {
     const { chatId = -1002145893201, chatTitle = 'Новый проект' } = req.body || {};

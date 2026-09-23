@@ -349,9 +349,11 @@ export const TasksView: React.FC<TasksViewProps> = () => {
                       const rawName = task.ownerName || task.assignedTo || 'Участник';
                       const cleanName = rawName.replace(/\s*\([^)]*\)/g, '').trim();
                       const member = projectMembers.find(m => m.name === rawName || m.name === cleanName);
+                      const validTaskAvatar = (task.ownerAvatar && !task.ownerAvatar.includes('unsplash')) ? task.ownerAvatar : undefined;
+                      const validMemberAvatar = (member?.avatar && !member.avatar.includes('unsplash')) ? member.avatar : undefined;
                       return (
                         <UserAvatar 
-                          avatar={task.ownerAvatar || member?.avatar || (member?.name === currentUser.name ? currentUser.avatar : undefined)}
+                          avatar={validTaskAvatar || validMemberAvatar || (member?.name === currentUser.name ? currentUser.avatar : undefined)}
                           name={member?.name || cleanName || rawName}
                           size="sm"
                         />
@@ -369,101 +371,117 @@ export const TasksView: React.FC<TasksViewProps> = () => {
 
                 {/* Subtasks Expanded Container */}
                 {isExpanded && (
-                  <div className="pl-12 pr-4 pb-3 space-y-2 bg-[#F2F2F7]/40 border-t border-[#C6C6C8]/20">
+                  <div className="pl-4 sm:pl-11 pr-3 sm:pr-4 pb-3 space-y-2 bg-[#F2F2F7]/50 border-t border-[#C6C6C8]/20">
                     {/* Subtask rows */}
                     <div className="space-y-1.5 pt-2">
-                      {subtasks.map(st => (
-                        <div key={st.id} className="py-1.5 px-2 bg-white/70 hover:bg-white rounded-[10px] border border-black/5 flex items-center justify-between gap-2.5 transition-colors">
-                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const nextStatus = st.status === 'done' ? 'todo' : 'done';
-                                updateSubtaskStatus(task.id, st.id, nextStatus);
-                              }}
-                              className={`w-4.5 h-4.5 rounded-[5px] border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
-                                st.status === 'done'
-                                  ? 'bg-[#34C759] border-[#34C759] text-white'
-                                  : st.status === 'in_progress'
-                                  ? 'bg-[#FF9500] border-[#FF9500] text-white'
-                                  : 'border-[#C6C6C8] bg-white hover:border-[#007AFF]'
-                              }`}
-                              title={st.status === 'done' ? 'Выполнено (нажмите для отмены)' : 'Отметить как выполненное'}
-                            >
-                              {st.status === 'done' && <Check className="w-3 h-3 stroke-[3]" />}
-                              {st.status === 'in_progress' && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                            </button>
-                            <span 
-                              onClick={() => {
-                                const nextStatus = st.status === 'done' ? 'todo' : 'done';
-                                updateSubtaskStatus(task.id, st.id, nextStatus);
-                              }}
-                              className={`text-[13.5px] truncate cursor-pointer select-none transition-colors ${
-                                st.status === 'done' ? 'line-through text-[#8E8E93]' : 'text-black'
-                              }`}
-                            >
-                              {st.title}
-                            </span>
-                          </div>
+                      {subtasks.map(st => {
+                        const validSubtaskAvatar = (st.assignedAvatar && !st.assignedAvatar.includes('unsplash')) ? st.assignedAvatar : undefined;
+                        const subtaskMember = projectMembers.find(m => m.name === st.assignedTo);
+                        const validMemberAvatar = (subtaskMember?.avatar && !subtaskMember.avatar.includes('unsplash')) ? subtaskMember.avatar : undefined;
+                        const resolvedAvatar = validSubtaskAvatar || validMemberAvatar || (st.assignedTo === currentUser.name ? currentUser.avatar : undefined);
 
-                          <div className="flex items-center gap-2 shrink-0">
-                            {/* Subtask Assignee Selector */}
-                            <div className="flex items-center gap-1.5 bg-slate-100/90 hover:bg-slate-200/90 rounded-full pl-1 pr-2 py-0.5 border border-black/5 transition-colors">
-                              <UserAvatar 
-                                avatar={st.assignedAvatar || projectMembers.find(m => m.name === st.assignedTo)?.avatar || (st.assignedTo === currentUser.name ? currentUser.avatar : undefined)} 
-                                name={st.assignedTo || 'Участник'} 
-                                size="xs" 
-                              />
-                              <select
-                                value={st.assignedTo || ''}
-                                onChange={(e) => {
-                                  const selectedName = e.target.value;
-                                  const member = projectMembers.find(m => m.name === selectedName);
-                                  updateSubtaskAssignee(task.id, st.id, selectedName, member?.avatar);
+                        return (
+                          <div key={st.id} className="py-2 px-2.5 bg-white rounded-xl border border-black/5 flex items-center justify-between gap-2 shadow-2xs transition-colors">
+                            {/* Checkbox and Subtask Title */}
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextStatus = st.status === 'done' ? 'todo' : 'done';
+                                  updateSubtaskStatus(task.id, st.id, nextStatus);
                                 }}
-                                className="text-[11px] font-medium bg-transparent text-slate-800 focus:outline-none cursor-pointer pr-1"
-                                title="Изменить ответственного за подзадачу"
+                                className={`w-4.5 h-4.5 rounded-[5px] border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                                  st.status === 'done'
+                                    ? 'bg-[#34C759] border-[#34C759] text-white'
+                                    : st.status === 'in_progress'
+                                    ? 'bg-[#FF9500] border-[#FF9500] text-white'
+                                    : 'border-[#C6C6C8] bg-white hover:border-[#007AFF]'
+                                }`}
+                                title={st.status === 'done' ? 'Выполнено (нажмите для отмены)' : 'Отметить как выполненное'}
                               >
-                                {projectMembers.map(m => (
-                                  <option key={m.id} value={m.name}>
-                                    {m.name}
-                                  </option>
-                                ))}
-                                <option value="Вся команда">Вся команда</option>
-                                {!projectMembers.some(m => m.name === st.assignedTo) && st.assignedTo && st.assignedTo !== 'Вся команда' && (
-                                  <option value={st.assignedTo}>{st.assignedTo}</option>
-                                )}
-                              </select>
+                                {st.status === 'done' && <Check className="w-3 h-3 stroke-[3]" />}
+                                {st.status === 'in_progress' && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                              </button>
+                              <span 
+                                onClick={() => {
+                                  const nextStatus = st.status === 'done' ? 'todo' : 'done';
+                                  updateSubtaskStatus(task.id, st.id, nextStatus);
+                                }}
+                                className={`text-[13px] truncate cursor-pointer select-none transition-colors leading-snug ${
+                                  st.status === 'done' ? 'line-through text-[#8E8E93]' : 'text-slate-900 font-medium'
+                                }`}
+                                title={st.title}
+                              >
+                                {st.title}
+                              </span>
                             </div>
 
-                            {/* Subtask Status Selector */}
-                            <select
-                              value={st.status}
-                              onChange={(e) => updateSubtaskStatus(task.id, st.id, e.target.value as 'todo' | 'in_progress' | 'done')}
-                              className={`text-[11px] font-medium px-2 py-0.5 rounded-[6px] border border-transparent cursor-pointer focus:outline-none transition-colors ${
-                                st.status === 'done'
-                                  ? 'bg-[#34C759]/15 text-[#34C759]'
-                                  : st.status === 'in_progress'
-                                  ? 'bg-[#FF9500]/15 text-[#FF9500]'
-                                  : 'bg-[#767680]/12 text-[#8E8E93]'
-                              }`}
-                            >
-                              <option value="todo">Сделать</option>
-                              <option value="in_progress">В работе</option>
-                              <option value="done">Готово</option>
-                            </select>
+                            {/* Right Controls: Assignee Avatar + Status + Delete */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {/* Assignee Avatar with native invisible select */}
+                              <div 
+                                className="relative inline-flex items-center justify-center p-0.5 rounded-full hover:ring-2 hover:ring-[#007AFF]/30 transition-all cursor-pointer shrink-0" 
+                                title={`Ответственный: ${st.assignedTo || 'Не назначен'}`}
+                              >
+                                <UserAvatar 
+                                  avatar={resolvedAvatar} 
+                                  name={st.assignedTo || 'Участник'} 
+                                  size="xs" 
+                                />
+                                <select
+                                  value={st.assignedTo || ''}
+                                  onChange={(e) => {
+                                    const selectedName = e.target.value;
+                                    const member = projectMembers.find(m => m.name === selectedName);
+                                    updateSubtaskAssignee(task.id, st.id, selectedName, member?.avatar);
+                                  }}
+                                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                                  title="Изменить ответственного"
+                                >
+                                  {projectMembers.map(m => (
+                                    <option key={m.id} value={m.name}>
+                                      {m.name}
+                                    </option>
+                                  ))}
+                                  <option value="Вся команда">Вся команда</option>
+                                  {!projectMembers.some(m => m.name === st.assignedTo) && st.assignedTo && st.assignedTo !== 'Вся команда' && (
+                                    <option value={st.assignedTo}>{st.assignedTo}</option>
+                                  )}
+                                </select>
+                              </div>
 
-                            <button
-                              type="button"
-                              onClick={() => deleteSubtask(task.id, st.id)}
-                              className="text-[#8E8E93] hover:text-[#FF3B30] p-1 cursor-pointer transition-colors"
-                              title="Удалить подзадачу"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                              {/* Status Selector */}
+                              <div className="relative inline-flex items-center shrink-0">
+                                <select
+                                  value={st.status}
+                                  onChange={(e) => updateSubtaskStatus(task.id, st.id, e.target.value as 'todo' | 'in_progress' | 'done')}
+                                  className={`appearance-none text-[11px] font-semibold px-2 py-0.5 rounded-[6px] border border-transparent cursor-pointer focus:outline-none transition-colors ${
+                                    st.status === 'done'
+                                      ? 'bg-[#34C759]/15 text-[#34C759]'
+                                      : st.status === 'in_progress'
+                                      ? 'bg-[#FF9500]/15 text-[#FF9500]'
+                                      : 'bg-[#767680]/12 text-[#8E8E93]'
+                                  }`}
+                                >
+                                  <option value="todo">Сделать</option>
+                                  <option value="in_progress">В работе</option>
+                                  <option value="done">Готово</option>
+                                </select>
+                              </div>
+
+                              {/* Delete button */}
+                              <button
+                                type="button"
+                                onClick={() => deleteSubtask(task.id, st.id)}
+                                className="text-[#8E8E93] hover:text-[#FF3B30] p-1 cursor-pointer transition-colors"
+                                title="Удалить подзадачу"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     {/* Add Subtask Inline Input */}
@@ -482,39 +500,50 @@ export const TasksView: React.FC<TasksViewProps> = () => {
                             handleAddSubtask(task.id);
                           }
                         }}
-                        placeholder="Новая подзадача"
-                        className="flex-1 text-[13px] bg-white border border-[#C6C6C8]/60 rounded-[8px] px-2.5 py-1 focus:outline-none"
+                        placeholder="Новая подзадача..."
+                        className="flex-1 min-w-0 text-[13px] bg-white border border-[#C6C6C8]/60 rounded-[8px] px-2.5 py-1.5 focus:outline-none focus:border-[#007AFF] transition-colors"
                       />
 
-                      <select
-                        value={inputState.assignedTo}
-                        onChange={(e) => {
-                          const selectedName = e.target.value;
-                          const member = projectMembers.find(m => m.name === selectedName);
-                          setNewSubtaskInputs(prev => ({
-                            ...prev,
-                            [task.id]: { 
-                              ...inputState, 
-                              assignedTo: selectedName, 
-                              assignedAvatar: member?.avatar || '' 
-                            }
-                          }));
-                        }}
-                        className="text-[11px] font-medium bg-white border border-[#C6C6C8]/60 rounded-[8px] px-2 py-1 focus:outline-none cursor-pointer text-slate-800"
-                        title="Назначить ответственного"
-                      >
-                        {projectMembers.map(m => (
-                          <option key={m.id} value={m.name}>
-                            {m.name}
-                          </option>
-                        ))}
-                        <option value="Вся команда">Вся команда</option>
-                      </select>
+                      {/* Compact Assignee selector button */}
+                      <div className="relative shrink-0 flex items-center gap-1.5 bg-white border border-[#C6C6C8]/60 rounded-[8px] px-2 py-1 cursor-pointer hover:border-slate-400 transition-colors">
+                        <UserAvatar 
+                          avatar={inputState.assignedAvatar || projectMembers.find(m => m.name === inputState.assignedTo)?.avatar || (inputState.assignedTo === currentUser.name ? currentUser.avatar : undefined)}
+                          name={inputState.assignedTo || 'Участник'}
+                          size="xs"
+                        />
+                        <span className="text-[11.5px] font-medium text-slate-700 max-w-[65px] sm:max-w-[90px] truncate">
+                          {inputState.assignedTo?.split(' ')[0] || 'Команда'}
+                        </span>
+                        <select
+                          value={inputState.assignedTo}
+                          onChange={(e) => {
+                            const selectedName = e.target.value;
+                            const member = projectMembers.find(m => m.name === selectedName);
+                            setNewSubtaskInputs(prev => ({
+                              ...prev,
+                              [task.id]: { 
+                                ...inputState, 
+                                assignedTo: selectedName, 
+                                assignedAvatar: member?.avatar || '' 
+                              }
+                            }));
+                          }}
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          title="Назначить ответственного"
+                        >
+                          {projectMembers.map(m => (
+                            <option key={m.id} value={m.name}>
+                              {m.name}
+                            </option>
+                          ))}
+                          <option value="Вся команда">Вся команда</option>
+                        </select>
+                      </div>
 
                       <button
                         type="button"
                         onClick={() => handleAddSubtask(task.id)}
-                        className="text-[13px] text-[#007AFF] font-semibold px-2 py-1 cursor-pointer shrink-0"
+                        className="text-[13px] text-[#007AFF] font-semibold px-2 py-1.5 hover:bg-[#007AFF]/10 rounded-[8px] cursor-pointer shrink-0 transition-colors"
                       >
                         Добавить
                       </button>

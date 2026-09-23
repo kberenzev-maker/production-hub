@@ -174,13 +174,13 @@ const DEFAULT_NORMS: ProductionNorms = {
 };
 
 const INITIAL_CHAT_USERS: ChatUser[] = [
-  { id: 'u1', telegramUsername: '@kirillber', name: 'Кирилл', role: 'super_admin', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', customTitle: 'Продюсер' },
-  { id: 'u2', telegramUsername: '@vera_expert', name: 'Вера', role: 'expert', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80', customTitle: 'Эксперт' },
-  { id: 'u3', telegramUsername: '@arseniy_editor', name: 'Арсений', role: 'editor', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', customTitle: 'Монтажёр' },
-  { id: 'u4', telegramUsername: '@marina_designer', name: 'Марина', role: 'designer', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', customTitle: 'Дизайнер' },
-  { id: 'u5', telegramUsername: '@dasha_publisher', name: 'Даша', role: 'publisher', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80', customTitle: 'Ассистент' },
-  { id: 'u6', telegramUsername: '@gleb_cameraman', name: 'Глеб', role: 'editor', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80', customTitle: 'Видеограф / Съемка' },
-  { id: 'u7', telegramUsername: '@alex_scripts', name: 'Алексей', role: 'editor', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', customTitle: 'Сценарист' },
+  { id: 'u1', telegramUsername: '@kirillber', name: 'Кирилл', role: 'super_admin', avatar: '/api/telegram/avatar/1315106036', customTitle: 'Продюсер' },
+  { id: 'u2', telegramUsername: '@vera_expert', name: 'Вера', role: 'expert', customTitle: 'Эксперт' },
+  { id: 'u3', telegramUsername: '@arseniy_editor', name: 'Арсений', role: 'editor', customTitle: 'Монтажёр' },
+  { id: 'u4', telegramUsername: '@marina_designer', name: 'Марина', role: 'designer', customTitle: 'Дизайнер' },
+  { id: 'u5', telegramUsername: '@dasha_publisher', name: 'Даша', role: 'publisher', customTitle: 'Ассистент' },
+  { id: 'u6', telegramUsername: '@gleb_cameraman', name: 'Глеб', role: 'editor', customTitle: 'Видеограф / Съемка' },
+  { id: 'u7', telegramUsername: '@alex_scripts', name: 'Алексей', role: 'editor', customTitle: 'Сценарист' },
 ];
 
 export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -238,7 +238,9 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ? matchedMember.roles 
       : (currentProject?.members?.[0]?.roles || ['producer']);
 
-    const avatar = tgUser?.photo_url || matchedMember?.avatar;
+    const tgUserId = tgUser?.id || matchedMember?.telegramUserId;
+    const realAvatarUrl = tgUserId ? `/api/telegram/avatar/${tgUserId}` : undefined;
+    const avatar = realAvatarUrl || (matchedMember?.avatar && !matchedMember.avatar.includes('unsplash') && !matchedMember.avatar.endsWith('.svg') ? matchedMember.avatar : undefined) || (tgUser?.photo_url && !tgUser.photo_url.endsWith('.svg') ? tgUser.photo_url : undefined);
 
     return {
       id: tgUser?.id,
@@ -265,8 +267,12 @@ export const ProductionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (matchedMember) {
       let changed = false;
       const updatedMember = { ...matchedMember };
-      if (tgUser.photo_url && matchedMember.avatar !== tgUser.photo_url) {
-        updatedMember.avatar = tgUser.photo_url;
+      const effectiveAvatar = tgUser.id 
+        ? `/api/telegram/avatar/${tgUser.id}` 
+        : (tgUser.photo_url && !tgUser.photo_url.endsWith('.svg') ? tgUser.photo_url : matchedMember.avatar);
+
+      if (effectiveAvatar && matchedMember.avatar !== effectiveAvatar) {
+        updatedMember.avatar = effectiveAvatar;
         changed = true;
       }
       if (tgUser.id && !matchedMember.telegramUserId) {

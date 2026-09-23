@@ -16,4 +16,10 @@
     text-align: left;
     unicode-bidi: plaintext;
   }
+
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
 }
