@@ -1,6 +1,26 @@
 {
   "tasks": [
     {
+      "id": "973",
+      "title": "тест идеи",
+      "type": "reels",
+      "kind": "content",
+      "expertId": "1315106036",
+      "expertName": "Кирилл Березнев",
+      "projectId": "-1004292800394",
+      "scriptStatus": "gray",
+      "shootingStatus": "gray",
+      "editingStatus": "gray",
+      "materialsTotalCount": 0,
+      "pools": [],
+      "ideaDescription": "тест идеи",
+      "references": [],
+      "voiceNotes": [],
+      "placement": "unassigned",
+      "createdAt": "2026-09-23T07:46:47.708Z",
+      "updatedAt": "2026-09-23T07:46:47.708Z"
+    },
+    {
       "id": "050",
       "title": "Тест",
       "type": "reels",
@@ -63,7 +83,7 @@
       "voiceNotes": [
         {
           "id": "voice-1790112152219",
-          "url": "https://api.telegram.org/file/bot8782045236:AAG5NQkGiaXsDhhHKJMm-TR-KLw6Wo6ZKqs/voice/file_0.oga",
+          "url": "/api/telegram/voice/file_0.mp3",
           "duration": 3,
           "senderName": "Кирилл Березнев",
           "textTranscript": "",
@@ -112,5 +132,5 @@
     }
   ],
   "version": 1,
-  "updatedAt": "2026-09-23T07:40:10.098Z"
+  "updatedAt": "2026-09-23T07:46:47.710Z"
 }

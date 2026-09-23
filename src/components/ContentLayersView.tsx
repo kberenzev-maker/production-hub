@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useProduction } from '../context/ProductionContext';
 import { TaskCard, ContentType } from '../types';
+import { VoiceNotePlayer } from './VoiceNotePlayer';
 import { 
   CheckCircle2, 
   Lock, 
@@ -10,11 +11,13 @@ import {
   Video, 
   Plus, 
   Check, 
-  Search,
-  X,
-  CalendarDays,
-  AlertTriangle,
-  SlidersHorizontal
+  Search, 
+  X, 
+  CalendarDays, 
+  AlertTriangle, 
+  SlidersHorizontal,
+  Mic,
+  Link2
 } from 'lucide-react';
 
 export type StageFilterOption = 'all' | 'ideas' | 'in_progress' | 'ready';
@@ -23,15 +26,16 @@ export const ContentLayersView: React.FC = () => {
   const { 
     tasks, 
     currentExpertId, 
-    currentProjectId,
-    currentProject,
+    currentProjectId, 
+    currentProject, 
     activeRole, 
     updateTaskDetails, 
     scheduleShooting, 
-    createIdea,
-    rejectTask,
-    restoreTask,
-    addBotLog
+    createIdea, 
+    rejectTask, 
+    restoreTask, 
+    addBotLog,
+    setSelectedTaskId
   } = useProduction();
 
   // Filters
@@ -471,10 +475,21 @@ export const ContentLayersView: React.FC = () => {
                 <div className="bg-white rounded-[16px] divide-y divide-[#C6C6C8]/40 overflow-hidden">
                   
                   {/* Row 0: Entity Title */}
-                  <div className="px-4 py-3 flex items-center justify-between gap-3">
-                    <h3 className="text-[16px] font-semibold text-black tracking-tight leading-snug">
-                      {task.title}
-                    </h3>
+                  <div 
+                    onClick={() => setSelectedTaskId(task.id)}
+                    className="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-black/[0.02] transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h3 className="text-[16px] font-semibold text-black tracking-tight leading-snug truncate">
+                        {task.title}
+                      </h3>
+                      {task.voiceNotes && task.voiceNotes.length > 0 && (
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 bg-[#007AFF]/10 text-[#007AFF] text-[11px] font-semibold rounded-md shrink-0">
+                          <Mic className="w-3 h-3" />
+                          <span>{task.voiceNotes.length}</span>
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[12px] font-medium text-[#8E8E93] shrink-0">
                       {task.rejected ? 'Брак' : `${naturalLayer} из 5`}
                     </span>
@@ -526,6 +541,43 @@ export const ContentLayersView: React.FC = () => {
                             <p className="text-[14px] text-black leading-relaxed">
                               {task.ideaDescription || 'Идея зафиксирована из чата.'}
                             </p>
+
+                            {/* Voice Notes */}
+                            {task.voiceNotes && task.voiceNotes.length > 0 && (
+                              <div className="space-y-2 pt-1">
+                                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider">
+                                  <Mic className="w-3.5 h-3.5 text-[#007AFF]" />
+                                  <span>Голосовые заметки ({task.voiceNotes.length}):</span>
+                                </div>
+                                {task.voiceNotes.map(vn => (
+                                  <VoiceNotePlayer key={vn.id} voice={vn} />
+                                ))}
+                              </div>
+                            )}
+
+                            {/* References */}
+                            {task.references && task.references.length > 0 && (
+                              <div className="space-y-1.5 pt-1">
+                                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider">
+                                  <Link2 className="w-3.5 h-3.5 text-purple-600" />
+                                  <span>Ссылки и референсы ({task.references.length}):</span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  {task.references.map(ref => (
+                                    <a
+                                      key={ref.id}
+                                      href={ref.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="flex items-center gap-1.5 text-[13px] text-[#007AFF] hover:underline truncate"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                                      <span className="truncate">{ref.title || ref.url}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
 
                             <div className="flex items-center justify-between text-[13px] pt-1">
                               <span className="text-[#8E8E93]">Дедлайн:</span>

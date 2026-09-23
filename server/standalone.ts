@@ -161,6 +161,21 @@ const bot = new ProductionTelegramBot({
     }
     saveDatabase(activeDb);
     broadcast({ type: 'PROJECT_UPSERTED', project: proj });
+  },
+  onTaskApproved: (taskId: string) => {
+    const activeDb = loadDatabase();
+    const task = activeDb.tasks.find((t: any) => t.id === taskId);
+    if (task) {
+      task.scriptStatus = 'yellow';
+      task.updatedAt = new Date().toISOString();
+      saveDatabase(activeDb);
+      broadcast({ type: 'TASK_UPSERTED', task });
+    }
+  },
+  getProjectTopics: (chatId: number) => {
+    const activeDb = loadDatabase();
+    const proj = activeDb.projects.find((p: any) => p.chatId === chatId);
+    return proj?.topics;
   }
 });
 
@@ -251,6 +266,58 @@ app.get('/api/telegram/avatar/:userId', async (req, res) => {
   } catch (err) {
     console.warn('[StandaloneServer] Error serving avatar for user', req.params.userId, err);
     return res.status(404).end();
+  }
+});
+
+// Stream Telegram voice notes with full HTTP 206 Partial Content (Range) support for Safari / iOS WebKit
+app.get('/api/telegram/voice/:filename', (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const audioDir = path.join(DB_DIR, 'audio');
+    const filePath = path.join(audioDir, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Audio file not found' });
+    }
+
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+    const ext = path.extname(filename).toLowerCase();
+    const mimeType = ext === '.mp3' ? 'audio/mpeg' : (ext === '.ogg' || ext === '.oga') ? 'audio/ogg' : 'audio/mpeg';
+
+    const range = req.headers.range;
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunkSize = (end - start) + 1;
+
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type': mimeType,
+        'Cache-Control': 'public, max-age=31536000',
+      });
+
+      const stream = fs.createReadStream(filePath, { start, end });
+      stream.pipe(res);
+    } else {
+      res.writeHead(200, {
+        'Content-Length': fileSize,
+        'Content-Type': mimeType,
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'public, max-age=31536000',
+      });
+
+      const stream = fs.createReadStream(filePath);
+      stream.pipe(res);
+    }
+  } catch (err) {
+    console.warn('[StandaloneServer] Error streaming voice file:', req.params.filename, err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Audio streaming error' });
+    }
   }
 });
 
